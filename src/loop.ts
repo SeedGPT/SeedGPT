@@ -1,6 +1,7 @@
 import * as git from './tools/git.js'
 import * as github from './tools/github.js'
 import * as codebase from './tools/codebase.js'
+import * as validation from './tools/validation.js'
 import * as llm from './llm.js'
 import * as pipeline from './pipeline.js'
 import * as memory from './memory.js'
@@ -55,6 +56,13 @@ export async function run(): Promise<void> {
 			} catch (err) {
 				await gitClient.checkout(['.'])
 				lastError = err instanceof Error ? err.message : String(err)
+				continue
+			}
+
+			const localResult = await validation.validate(config.workspacePath)
+			if (!localResult.passed) {
+				await gitClient.checkout(['.'])
+				lastError = localResult.error ?? 'Local validation failed with unknown error'
 				continue
 			}
 
