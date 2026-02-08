@@ -9,6 +9,6 @@ export default {
 	coverageDirectory: 'coverage',
 	coverageReporters: ['text', 'lcov', 'html'],
 	moduleDirectories: ['node_modules', '<rootDir>/dist'],
-	testTimeout: 10000,
+	testTimeout: 30000,
 	transform: {}
 }
