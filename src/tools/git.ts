@@ -25,7 +25,40 @@ export async function createBranch(git: SimpleGit, name: string): Promise<string
 	return branchName
 }
 
+function validateOperations(operations: EditOperation[]): string[] {
+	const errors: string[] = []
+
+	for (let i = 0; i < operations.length; i++) {
+		const op = operations[i]
+		const label = `operations[${i}] (${op.type})`
+
+		if (!op.filePath || op.filePath.trim() === '') {
+			errors.push(`${label}: filePath is required and must be non-empty`)
+		}
+
+		if (op.type === 'replace') {
+			if (op.oldString === undefined || op.oldString === null) {
+				errors.push(`${label}: oldString is required for replace operations`)
+			}
+			if (op.newString === undefined || op.newString === null) {
+				errors.push(`${label}: newString is required for replace operations`)
+			}
+		} else if (op.type === 'create') {
+			if ((op as any).content === undefined || (op as any).content === null) {
+				errors.push(`${label}: content is required for create operations`)
+			}
+		}
+	}
+
+	return errors
+}
+
 export async function applyEdits(operations: EditOperation[]): Promise<void> {
+	const validationErrors = validateOperations(operations)
+	if (validationErrors.length > 0) {
+		throw new Error(`Edit operation validation failed:\n${validationErrors.join('\n')}`)
+	}
+
 	const errors: string[] = []
 
 	for (const op of operations) {
