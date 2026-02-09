@@ -59,14 +59,16 @@ export async function httpFetch(
       ok: response.ok,
     };
   } catch (error: unknown) {
-    if (error instanceof DOMException && error.name === "AbortError") {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errName = error instanceof Error ? error.name : "";
+    if (errName === "AbortError" || errMsg.includes("aborted")) {
       throw new Error(`Request to ${url} timed out after ${timeoutMs}ms`);
     }
     if (error instanceof TypeError) {
-      throw new Error(`Network error fetching ${url}: ${error.message}`);
+      throw new Error(`Network error fetching ${url}: ${errMsg}`);
     }
     throw new Error(
-      `Failed to fetch ${url}: ${error instanceof Error ? error.message : String(error)}`,
+      `Failed to fetch ${url}: ${errMsg}`,
     );
   } finally {
     clearTimeout(timeoutId);
