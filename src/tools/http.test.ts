@@ -1,4 +1,5 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "node:test";
+import assert from "node:assert";
 import { httpFetch } from "./http";
 import { createServer, IncomingMessage, ServerResponse, Server } from "node:http";
 import { AddressInfo } from "node:net";
