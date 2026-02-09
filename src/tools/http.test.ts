@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "node:test";
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert";
 import { httpFetch } from "./http";
 import { createServer, IncomingMessage, ServerResponse, Server } from "node:http";
@@ -7,7 +7,7 @@ import { AddressInfo } from "node:net";
 let server: Server;
 let baseUrl: string;
 
-beforeAll(async () => {
+before(async () => {
   server = createServer((req: IncomingMessage, res: ServerResponse) => {
     const url = req.url ?? "/";
 
@@ -49,7 +49,7 @@ beforeAll(async () => {
   });
 });
 
-afterAll(async () => {
+after(async () => {
   await new Promise<void>((resolve) => {
     server.close(() => resolve());
   });
@@ -59,20 +59,20 @@ describe("httpFetch", () => {
   it("should fetch a successful text response", async () => {
     const response = await httpFetch(`${baseUrl}/ok`);
 
-    expect(response.status).toBe(200);
-    expect(response.ok).toBe(true);
-    expect(response.body).toBe("hello world");
-    expect(response.headers["content-type"]).toBe("text/plain");
-    expect(response.headers["x-custom"]).toBe("test-value");
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.ok, true);
+    assert.strictEqual(response.body, "hello world");
+    assert.strictEqual(response.headers["content-type"], "text/plain");
+    assert.strictEqual(response.headers["x-custom"], "test-value");
   });
 
   it("should fetch a JSON response as text", async () => {
     const response = await httpFetch(`${baseUrl}/json`);
 
-    expect(response.status).toBe(200);
-    expect(response.ok).toBe(true);
-    expect(JSON.parse(response.body)).toEqual({ message: "ok" });
-    expect(response.headers["content-type"]).toBe("application/json");
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.ok, true);
+    assert.deepStrictEqual(JSON.parse(response.body), { message: "ok" });
+    assert.strictEqual(response.headers["content-type"], "application/json");
   });
 
   it("should handle POST requests with a body", async () => {
@@ -82,32 +82,36 @@ describe("httpFetch", () => {
       body: "request body content",
     });
 
-    expect(response.status).toBe(200);
-    expect(response.body).toBe("request body content");
+    assert.strictEqual(response.status, 200);
+    assert.strictEqual(response.body, "request body content");
   });
 
   it("should handle non-2xx responses without throwing", async () => {
     const response = await httpFetch(`${baseUrl}/not-found`);
 
-    expect(response.status).toBe(404);
-    expect(response.ok).toBe(false);
-    expect(response.body).toBe("not found");
+    assert.strictEqual(response.status, 404);
+    assert.strictEqual(response.ok, false);
+    assert.strictEqual(response.body, "not found");
   });
 
   it("should throw on timeout", async () => {
-    await expect(
-      httpFetch(`${baseUrl}/slow`, { timeoutMs: 100 }),
-    ).rejects.toThrow(/timed out after 100ms/);
+    await assert.rejects(
+      () => httpFetch(`${baseUrl}/slow`, { timeoutMs: 100 }),
+      (err: Error) => {
+        assert.match(err.message, /timed out after 100ms/);
+        return true;
+      },
+    );
   });
 
   it("should throw on network error (invalid URL)", async () => {
-    await expect(
-      httpFetch("http://127.0.0.1:1/nonexistent"),
-    ).rejects.toThrow();
+    await assert.rejects(
+      () => httpFetch("http://127.0.0.1:1/nonexistent"),
+    );
   });
 
   it("should use GET method by default", async () => {
     const response = await httpFetch(`${baseUrl}/ok`);
-    expect(response.status).toBe(200);
+    assert.strictEqual(response.status, 200);
   });
 });
