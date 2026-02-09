@@ -3,6 +3,7 @@ import logger from '../logger.js'
 import * as memory from '../memory.js'
 import * as codebase from './codebase.js'
 import * as git from './git.js'
+import * as analytics from '../analytics.js'
 
 export interface FileEdit {
 	type: 'replace'
@@ -103,6 +104,58 @@ const recallMemory = {
 				description: 'A specific memory ID to look up',
 			},
 		},
+	},
+}
+
+const queryIterations = {
+	name: 'query_iterations' as const,
+	description: 'Query recent development iterations to analyze patterns in successes and failures. Returns plan titles, outcomes, and reflections.',
+	input_schema: {
+		type: 'object' as const,
+		properties: {
+			limit: {
+				type: 'number' as const,
+				description: 'Number of iterations to retrieve (default: 10, max: 50)',
+			},
+			outcomeFilter: {
+				type: 'string' as const,
+				enum: ['success', 'failure'],
+				description: 'Filter by outcome type: "success" for merged PRs, "failure" for failed attempts',
+			},
+		},
+	},
+}
+
+const queryUsageTrends = {
+	name: 'query_usage_trends' as const,
+	description: 'Analyze API usage trends over recent iterations. Shows cost, token consumption, and model usage patterns.',
+	input_schema: {
+		type: 'object' as const,
+		properties: {
+			limit: {
+				type: 'number' as const,
+				description: 'Number of iterations to analyze (default: 10, max: 50)',
+			},
+		},
+	},
+}
+
+const searchReflections = {
+	name: 'search_reflections' as const,
+	description: 'Search past self-reflections by keyword. Use this to find what you learned from similar situations.',
+	input_schema: {
+		type: 'object' as const,
+		properties: {
+			query: {
+				type: 'string' as const,
+				description: 'Keyword or phrase to search for in reflections',
+			},
+			limit: {
+				type: 'number' as const,
+				description: 'Number of results to return (default: 5, max: 20)',
+			},
+		},
+		required: ['query'],
 	},
 }
 
@@ -281,7 +334,7 @@ const codebaseDiff = {
 	},
 }
 
-export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, readFile, grepSearch, fileSearch, listDirectory]
+export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, readFile, grepSearch, fileSearch, listDirectory, queryIterations, queryUsageTrends, searchReflections]
 export const BUILDER_TOOLS = [editFile, createFile, deleteFile, readFile, grepSearch, fileSearch, listDirectory, gitDiff, codebaseDiff, done]
 
 export async function handleTool(name: string, input: Record<string, unknown>, id: string): Promise<ToolResult> {
@@ -405,6 +458,26 @@ export async function handleTool(name: string, input: Record<string, unknown>, i
 		const { summary } = input as { summary: string }
 		logger.info(`Builder summary: ${summary.slice(0, 200)}`)
 		return { type: 'tool_result', tool_use_id: id, content: 'Implementation complete.' }
+	}
+
+	if (name === 'query_iterations') {
+		const limit = (input.limit as number | undefined) ?? 10
+		const outcomeFilter = input.outcomeFilter as 'success' | 'failure' | undefined
+		const result = await analytics.queryIterations(limit, outcomeFilter)
+		return { type: 'tool_result', tool_use_id: id, content: result }
+	}
+
+	if (name === 'query_usage_trends') {
+		const limit = (input.limit as number | undefined) ?? 10
+		const result = await analytics.queryUsageTrends(limit)
+		return { type: 'tool_result', tool_use_id: id, content: result }
+	}
+
+	if (name === 'search_reflections') {
+		const query = input.query as string
+		const limit = (input.limit as number | undefined) ?? 5
+		const result = await analytics.searchReflections(query, limit)
+		return { type: 'tool_result', tool_use_id: id, content: result }
 	}
 
 	return { type: 'tool_result', tool_use_id: id, content: `Unknown tool: ${name}`, is_error: true }
