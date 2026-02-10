@@ -239,6 +239,16 @@ const deleteFile = {
 	},
 }
 
+const runTests = {
+	name: 'run_tests' as const,
+	description: 'Execute the test suite to verify code correctness. Returns test output including any failures. Use this before calling done() to ensure your changes work correctly.',
+	input_schema: {
+		type: 'object' as const,
+		properties: {},
+		required: [],
+	},
+}
+
 const done = {
 	name: 'done' as const,
 	description: 'Signal that all edits are complete and the implementation is finished. Only call this when you have made all the changes described in the plan.',
@@ -282,7 +292,7 @@ const codebaseDiff = {
 }
 
 export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, readFile, grepSearch, fileSearch, listDirectory]
-export const BUILDER_TOOLS = [editFile, createFile, deleteFile, readFile, grepSearch, fileSearch, listDirectory, gitDiff, codebaseDiff, done]
+export const BUILDER_TOOLS = [editFile, createFile, deleteFile, readFile, grepSearch, fileSearch, listDirectory, gitDiff, codebaseDiff, runTests, done]
 
 export async function handleTool(name: string, input: Record<string, unknown>, id: string): Promise<ToolResult> {
 	if (name === 'read_file') {
@@ -429,6 +439,39 @@ export async function handleTool(name: string, input: Record<string, unknown>, i
 			return { type: 'tool_result', tool_use_id: id, content: `Deleted ${filePath}` }
 		} catch (err) {
 			return { type: 'tool_result', tool_use_id: id, content: err instanceof Error ? err.message : String(err), is_error: true }
+		}
+	}
+
+	if (name === 'run_tests') {
+		const { exec } = await import('child_process')
+		const { promisify } = await import('util')
+		const execAsync = promisify(exec)
+
+		try {
+			const { stdout, stderr } = await execAsync('npm test', {
+				cwd: config.workspacePath,
+				maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+			})
+			let output = `Exit code: 0\n\n${stdout}`
+			if (stderr) output += `\n${stderr}`
+
+			// Truncate if too long
+			if (output.length > 5000) {
+				output = output.substring(0, 5000) + '\n\n... (output truncated)'
+			}
+
+			return { type: 'tool_result', tool_use_id: id, content: output }
+		} catch (error: any) {
+			// Tests failed or command errored - return the output
+			let output = `Exit code: ${error.code || 'unknown'}\n\n`
+			if (error.stdout) output += error.stdout
+			if (error.stderr) output += `\n${error.stderr}`
+
+			if (output.length > 5000) {
+				output = output.substring(0, 5000) + '\n\n... (output truncated)'
+			}
+
+			return { type: 'tool_result', tool_use_id: id, content: output }
 		}
 	}
 
