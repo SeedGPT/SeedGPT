@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk'
 import MemoryModel from './models/Memory.js'
+import GeneratedModel from './models/Generated.js'
 import { config } from './config.js'
 import logger from './logger.js'
 import { trackUsage } from './usage.js'
@@ -143,4 +144,38 @@ export async function recallById(id: string): Promise<string> {
 
 	const date = new Date(memory.createdAt).toISOString().slice(0, 19).replace('T', ' ')
 	return `**${memory._id}** [${date}]\n${memory.content}`
+}
+
+// Retrieves recent iteration history to enable learning from past successes and failures.
+// Returns formatted history of the most recent 10 iterations including plan titles,
+// outcomes, reflections, and timestamps. Returns empty string if no history exists.
+export async function getIterationHistory(): Promise<string> {
+	try {
+		const iterations = await GeneratedModel
+			.find()
+			.sort({ createdAt: -1 })
+			.limit(10)
+			.select('planTitle outcome reflection createdAt')
+			.lean()
+
+		if (iterations.length === 0) {
+			return ''
+		}
+
+		const formatted = iterations.map(iter => {
+			const date = new Date(iter.createdAt).toISOString().slice(0, 19).replace('T', ' ')
+			return [
+				`### ${iter.planTitle}`,
+				`**Outcome:** ${iter.outcome}`,
+				`**Timestamp:** ${date}`,
+				`**Reflection:**`,
+				iter.reflection,
+			].join('\n')
+		})
+
+		return formatted.join('\n\n---\n\n')
+	} catch (error) {
+		logger.error('Failed to retrieve iteration history', { error })
+		return ''
+	}
 }

@@ -320,13 +320,14 @@ export interface PlanResult {
 	messages: Anthropic.MessageParam[]
 }
 
-export async function plan(recentMemory: string, codebaseContext: string, gitLog: string): Promise<PlanResult> {
+export async function plan(recentMemory: string, codebaseContext: string, gitLog: string, iterationHistory: string): Promise<PlanResult> {
 	logger.info('Asking LLM for a plan...')
 
 	const tools = PLANNER_TOOLS
+	const historySection = iterationHistory ? `\n\n## Past Iterations\n\n${iterationHistory}` : ''
 	const messages: Anthropic.MessageParam[] = [{
 		role: 'user',
-		content: `${recentMemory}\n\n${codebaseContext}\n\n## Recent Git History\n${gitLog}\n\nReview your notes and recent memories, then submit your plan.`,
+		content: `${recentMemory}\n\n${codebaseContext}\n\n## Recent Git History\n${gitLog}${historySection}\n\nReview your notes and recent memories, then submit your plan.`,
 	}]
 
 	const system = cachedSystem(SYSTEM_PLAN)

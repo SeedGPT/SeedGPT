@@ -26,6 +26,7 @@ jest.unstable_mockModule('@anthropic-ai/sdk', () => {
 
 const memory = await import('./memory.js')
 const MemoryModel = (await import('./models/Memory.js')).default
+const GeneratedModel = (await import('./models/Generated.js')).default
 const sdk = await import('@anthropic-ai/sdk') as unknown as { __mockCreate: jest.MockedFunction<() => Promise<{ content: Array<{ type: string, text: string }> }>> }
 
 let replSet: MongoMemoryReplSet
@@ -183,6 +184,67 @@ describe('memory', () => {
 			const fakeId = new mongoose.Types.ObjectId().toString()
 			const result = await memory.recallById(fakeId)
 			expect(result).toContain('No memory with id')
+		})
+	})
+
+	describe('getIterationHistory', () => {
+		it('returns empty string when no iterations exist', async () => {
+			const result = await memory.getIterationHistory()
+			expect(result).toBe('')
+		})
+
+		it('formats iteration history correctly', async () => {
+			// Create test iterations
+			await GeneratedModel.create([
+				{
+					planTitle: 'Test Plan 1',
+					outcome: 'merged',
+					plannerTranscript: 'planner1',
+					builderTranscript: 'builder1',
+					reflection: 'This worked well because we followed best practices.',
+					createdAt: new Date('2024-01-01T10:00:00Z'),
+				},
+				{
+					planTitle: 'Test Plan 2',
+					outcome: 'failed',
+					plannerTranscript: 'planner2',
+					builderTranscript: 'builder2',
+					reflection: 'This failed due to incorrect assumptions about the API.',
+					createdAt: new Date('2024-01-02T10:00:00Z'),
+				},
+			])
+
+			const result = await memory.getIterationHistory()
+
+			expect(result).toContain('### Test Plan 2') // Most recent first
+			expect(result).toContain('**Outcome:** failed')
+			expect(result).toContain('This failed due to incorrect assumptions about the API.')
+			expect(result).toContain('### Test Plan 1')
+			expect(result).toContain('**Outcome:** merged')
+			expect(result).toContain('This worked well because we followed best practices.')
+			expect(result).toContain('---') // Separator between iterations
+		})
+
+		it('limits to 10 most recent iterations', async () => {
+			// Create 15 iterations
+			const iterations = Array.from({ length: 15 }, (_, i) => ({
+				planTitle: `Plan ${i + 1}`,
+				outcome: 'merged',
+				plannerTranscript: `planner${i}`,
+				builderTranscript: `builder${i}`,
+				reflection: `Reflection ${i + 1}`,
+				createdAt: new Date(Date.now() + i * 1000), // Each one millisecond apart
+			}))
+			await GeneratedModel.create(iterations)
+
+			const result = await memory.getIterationHistory()
+
+			// Should contain the 10 most recent (Plan 15 through Plan 6)
+			expect(result).toContain('Plan 15')
+			expect(result).toContain('Plan 6')
+			// Should not contain the oldest ones
+			expect(result).not.toContain('Plan 5')
+			expect(result).not.toContain('Plan 1')
 		})
 	})
 })

@@ -27,6 +27,7 @@ export async function run(): Promise<void> {
 		// learns from the failure, and tries a different approach.
 		while (!merged) {
 			const recentMemory = await memory.getContext()
+			const iterationHistory = await memory.getIterationHistory()
 			const [fileTree, declarationIndex, depGraph] = await Promise.all([
 				codebase.getFileTree(config.workspacePath),
 				codebase.getDeclarationIndex(config.workspacePath),
@@ -36,7 +37,7 @@ export async function run(): Promise<void> {
 			const codebaseContext = `## File Tree\n\`\`\`\n${fileTree}\n\`\`\`\n\n## Dependency Graph\n${depGraph}\n\n## Declarations\n${declarationIndex}`
 			const gitLog = await git.getRecentLog(gitClient)
 
-			const { plan, messages: plannerMessages } = await llm.plan(recentMemory, codebaseContext, gitLog)
+			const { plan, messages: plannerMessages } = await llm.plan(recentMemory, codebaseContext, gitLog, iterationHistory)
 			await memory.store(`Planned change "${plan.title}": ${plan.description}`)
 
 			const session = new llm.PatchSession(plan, recentMemory)
