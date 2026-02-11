@@ -129,3 +129,35 @@ export async function recallById(id: string): Promise<string> {
 	const date = new Date(memory.createdAt).toISOString().slice(0, 19).replace('T', ' ')
 	return `**${memory._id}** [${date}]\n${memory.content}`
 }
+
+/**
+ * Get a summary of recent failures to help avoid repeating mistakes.
+ * Returns a formatted string of recent failure patterns or empty string if none found.
+ */
+export async function getFailureSummary(): Promise<string> {
+	try {
+		// Fetch the most recent 10 non-pinned memories (these are "past" memories)
+		const recentMemories = await MemoryModel.find({ pinned: false })
+			.sort({ createdAt: -1 })
+			.limit(10)
+			.lean()
+
+		// Filter for failure-related memories
+		const failureKeywords = ['failed', 'error', 'closed', 'ci failed', 'exit code', 'failure', 'failing']
+		const failures = recentMemories.filter(mem => {
+			const combined = `${mem.content} ${mem.summary}`.toLowerCase()
+			return failureKeywords.some(kw => combined.includes(kw))
+		})
+
+		if (failures.length === 0) {
+			return ''
+		}
+
+		// Format as a concise bullet list, limiting to 5 most recent
+		const items = failures.slice(0, 5).map(mem => `- ${mem.summary}`)
+		return items.join('\n')
+	} catch (err) {
+		logger.error('Failed to retrieve failure summary', { error: err })
+		return ''
+	}
+}

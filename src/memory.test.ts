@@ -176,4 +176,90 @@ describe('memory', () => {
 			expect(result).toContain('No memory with id')
 		})
 	})
+
+	describe('getFailureSummary', () => {
+		it('returns empty string when no memories exist', async () => {
+			const result = await memory.getFailureSummary()
+			expect(result).toBe('')
+		})
+
+		it('returns empty string when no failures exist', async () => {
+			await MemoryModel.create({ content: 'Successful PR merge', summary: 'Merged PR #1 successfully', pinned: false })
+			await MemoryModel.create({ content: 'Added new feature', summary: 'New feature added', pinned: false })
+
+			const result = await memory.getFailureSummary()
+			expect(result).toBe('')
+		})
+
+		it('returns failure summaries when failures exist', async () => {
+			await MemoryModel.create({ 
+				content: 'PR closed due to CI failure', 
+				summary: 'CI failed on PR #5 with exit code 1', 
+				pinned: false 
+			})
+			await MemoryModel.create({ 
+				content: 'Test error occurred', 
+				summary: 'Test suite failing with import errors', 
+				pinned: false 
+			})
+
+			const result = await memory.getFailureSummary()
+			expect(result).toContain('CI failed on PR #5 with exit code 1')
+			expect(result).toContain('Test suite failing with import errors')
+		})
+
+		it('limits results to 5 most recent failures', async () => {
+			// Create 7 failures
+			for (let i = 0; i < 7; i++) {
+				await MemoryModel.create({
+					content: `Failure ${i}`,
+					summary: `Error ${i}: test failed`,
+					pinned: false,
+				})
+			}
+
+			const result = await memory.getFailureSummary()
+			const lines = result.split('\n')
+			expect(lines.length).toBe(5)
+		})
+
+		it('ignores pinned memories', async () => {
+			await MemoryModel.create({ 
+				content: 'Note: avoid doing X because it failed', 
+				summary: 'Reminder about failed approach', 
+				pinned: true 
+			})
+			await MemoryModel.create({ 
+				content: 'Test failed in CI', 
+				summary: 'CI test failure on PR #3', 
+				pinned: false 
+			})
+
+			const result = await memory.getFailureSummary()
+			expect(result).toContain('CI test failure on PR #3')
+			expect(result).not.toContain('Reminder about failed approach')
+		})
+
+		it('detects various failure keywords', async () => {
+			await MemoryModel.create({ content: 'Build closed', summary: 'PR closed after failure', pinned: false })
+			await MemoryModel.create({ content: 'Got error message', summary: 'Error in compilation', pinned: false })
+			await MemoryModel.create({ content: 'CI failed', summary: 'CI failing on tests', pinned: false })
+
+			const result = await memory.getFailureSummary()
+			expect(result).toContain('PR closed after failure')
+			expect(result).toContain('Error in compilation')
+			expect(result).toContain('CI failing on tests')
+		})
+
+		it('formats results as bullet list', async () => {
+			await MemoryModel.create({ 
+				content: 'Test failed', 
+				summary: 'First failure summary', 
+				pinned: false 
+			})
+
+			const result = await memory.getFailureSummary()
+			expect(result).toMatch(/^- /)
+		})
+	})
 })
