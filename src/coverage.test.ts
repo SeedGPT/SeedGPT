@@ -5,6 +5,23 @@ const mockReadFile = jest.fn<(path: string, encoding: string) => Promise<string>
 
 jest.unstable_mockModule('fs/promises', () => ({
 	readFile: mockReadFile,
+	writeFile: jest.fn(),
+	mkdir: jest.fn(),
+	rm: jest.fn(),
+	mkdtemp: jest.fn(),
+	readdir: jest.fn(),
+	stat: jest.fn(),
+	access: jest.fn(),
+	default: {
+		readFile: mockReadFile,
+		writeFile: jest.fn(),
+		mkdir: jest.fn(),
+		rm: jest.fn(),
+		mkdtemp: jest.fn(),
+		readdir: jest.fn(),
+		stat: jest.fn(),
+		access: jest.fn(),
+	},
 }))
 
 const { analyzeCoverage, findUncoveredFiles, formatCoverageReport } = await import('./coverage.js')
