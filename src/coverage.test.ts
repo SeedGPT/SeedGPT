@@ -1,6 +1,7 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals'
 
 const mockReadFile = jest.fn<(path: string, encoding: string) => Promise<string>>()
+	.mockResolvedValue('')
 
 jest.unstable_mockModule('fs/promises', () => ({
 	readFile: mockReadFile,
