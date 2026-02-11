@@ -1,18 +1,16 @@
-import { describe, it, expect, jest, beforeEach, afterEach } from '@jest/globals'
-import { analyzeCoverage, findUncoveredFiles, formatCoverageReport } from './coverage'
+import { describe, it, expect, jest, beforeEach } from '@jest/globals'
 
-// Mock fs/promises
-jest.mock('fs/promises')
-const { readFile } = await import('fs/promises')
-const mockReadFile = readFile as jest.MockedFunction<typeof readFile>
+const mockReadFile = jest.fn<(path: string, encoding: string) => Promise<string>>()
+
+jest.unstable_mockModule('fs/promises', () => ({
+	readFile: mockReadFile,
+}))
+
+const { analyzeCoverage, findUncoveredFiles, formatCoverageReport } = await import('./coverage.js')
 
 describe('coverage', () => {
 	beforeEach(() => {
 		jest.clearAllMocks()
-	})
-
-	afterEach(() => {
-		jest.restoreAllMocks()
 	})
 
 	const sampleCoverage = {
