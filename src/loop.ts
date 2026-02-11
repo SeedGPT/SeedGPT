@@ -43,6 +43,10 @@ async function iterate(): Promise<boolean> {
 	const failureSummary = await getFailureSummary()
 	const coverageData = await getCoverage()
 
+	if (coverageData) {
+		await storePastMemory(`Current test coverage:\n${coverageData}`)
+	}
+
 	const { plan: iterationPlan, messages: plannerMessages } = await plan(recentMemory, gitLog, failureSummary, coverageData)
 	await storePastMemory(`Planned change "${iterationPlan.title}": ${iterationPlan.description}`)
 
