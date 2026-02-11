@@ -128,10 +128,11 @@ describe('run', () => {
 	it('stores coverage report in memory when available', async () => {
 		const getCoverage = pipeline.getCoverage as jest.MockedFunction<typeof pipeline.getCoverage>
 		getCoverage.mockResolvedValueOnce('Coverage: 80% statements, 70% branches')
+		getCoverage.mockResolvedValueOnce(null) // Second call after merge returns null
 
 		await run()
 
-		expect(memory.storePastMemory).toHaveBeenCalledWith(expect.stringContaining('Post-merge coverage report'))
+		expect(memory.storePastMemory).toHaveBeenCalledWith(expect.stringContaining('Current test coverage'))
 		expect(memory.storePastMemory).toHaveBeenCalledWith(expect.stringContaining('80% statements'))
 	})
 
