@@ -3,7 +3,7 @@ import { closePR, deleteRemoteBranch, mergePR, openPR } from './tools/github.js'
 import { snapshotCodebase } from './tools/codebase.js'
 import { awaitChecks, cleanupStalePRs, getCoverage } from './pipeline.js'
 import { config } from './config.js'
-import { getContext, storePastMemory } from './memory.js'
+import { getContext, getFailureSummary, storePastMemory } from './memory.js'
 import { connectToDatabase, disconnectFromDatabase } from './database.js'
 import logger, { writeIterationLog } from './logger.js'
 import { logSummary, saveUsageData } from './usage.js'
@@ -40,8 +40,9 @@ async function iterate(): Promise<boolean> {
 	await snapshotCodebase(config.workspacePath)
 	const recentMemory = await getContext()
 	const gitLog = await getRecentLog()
+	const failureSummary = await getFailureSummary()
 
-	const { plan: iterationPlan, messages: plannerMessages } = await plan(recentMemory, gitLog)
+	const { plan: iterationPlan, messages: plannerMessages } = await plan(recentMemory, gitLog, failureSummary)
 	await storePastMemory(`Planned change "${iterationPlan.title}": ${iterationPlan.description}`)
 
 	const session = new PatchSession(iterationPlan, recentMemory)

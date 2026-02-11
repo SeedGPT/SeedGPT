@@ -44,6 +44,7 @@ jest.unstable_mockModule('./tools/codebase.js', () => ({
 
 jest.unstable_mockModule('./memory.js', () => ({
 	getContext: jest.fn<() => Promise<string>>().mockResolvedValue('No memories yet. This is your first run.'),
+	getFailureSummary: jest.fn<() => Promise<string>>().mockResolvedValue(''),
 	storePastMemory: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }))
 

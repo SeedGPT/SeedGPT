@@ -18,12 +18,21 @@ export interface PlanResult {
 	messages: Anthropic.MessageParam[]
 }
 
-export async function plan(recentMemory: string, gitLog: string): Promise<PlanResult> {
+export async function plan(recentMemory: string, gitLog: string, failureSummary: string): Promise<PlanResult> {
 	logger.info('Asking LLM for a plan...')
+
+	// Build the context message with failure summary if available
+	let contextMessage = recentMemory
+	
+	if (failureSummary) {
+		contextMessage += `\n\n## Recent Failures to Avoid Repeating\n${failureSummary}`
+	}
+	
+	contextMessage += `\n\n## Recent Git History\n${gitLog}\n\nReview your notes and recent memories, then submit your plan.`
 
 	const messages: Anthropic.MessageParam[] = [{
 		role: 'user',
-		content: `${recentMemory}\n\n## Recent Git History\n${gitLog}\n\nReview your notes and recent memories, then submit your plan.`,
+		content: contextMessage,
 	}]
 
 	const maxRounds = config.maxPlannerRounds
