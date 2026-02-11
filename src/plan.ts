@@ -18,7 +18,7 @@ export interface PlanResult {
 	messages: Anthropic.MessageParam[]
 }
 
-export async function plan(recentMemory: string, gitLog: string, failureSummary: string): Promise<PlanResult> {
+export async function plan(recentMemory: string, gitLog: string, failureSummary: string, coverageData: string | null): Promise<PlanResult> {
 	logger.info('Asking LLM for a plan...')
 
 	// Build the context message with failure summary if available
@@ -26,6 +26,10 @@ export async function plan(recentMemory: string, gitLog: string, failureSummary:
 	
 	if (failureSummary) {
 		contextMessage += `\n\n## Recent Failures to Avoid Repeating\n${failureSummary}`
+	}
+	
+	if (coverageData && coverageData.trim()) {
+		contextMessage += `\n\n## Current Test Coverage\n${coverageData}`
 	}
 	
 	contextMessage += `\n\n## Recent Git History\n${gitLog}\n\nReview your notes and recent memories, then submit your plan.`

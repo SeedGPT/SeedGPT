@@ -41,8 +41,9 @@ async function iterate(): Promise<boolean> {
 	const recentMemory = await getContext()
 	const gitLog = await getRecentLog()
 	const failureSummary = await getFailureSummary()
+	const coverageData = await getCoverage()
 
-	const { plan: iterationPlan, messages: plannerMessages } = await plan(recentMemory, gitLog, failureSummary)
+	const { plan: iterationPlan, messages: plannerMessages } = await plan(recentMemory, gitLog, failureSummary, coverageData)
 	await storePastMemory(`Planned change "${iterationPlan.title}": ${iterationPlan.description}`)
 
 	const session = new PatchSession(iterationPlan, recentMemory)
