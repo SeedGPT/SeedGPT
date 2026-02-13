@@ -29,7 +29,12 @@ function log(level: Level, message: string, context?: Record<string, unknown>): 
 	}
 }
 
-export async function writeIterationLog(): Promise<void> {
+export async function writeIterationLog(tokenUsage?: {
+	planner: { input: number; output: number; cost: number }
+	builder: { input: number; output: number; cost: number }
+	reflect: { input: number; output: number; cost: number }
+	total: { input: number; output: number; cost: number }
+}): Promise<void> {
 	try {
 		await IterationLogModel.create({
 			entries: logBuffer.map(e => ({
@@ -38,6 +43,7 @@ export async function writeIterationLog(): Promise<void> {
 				message: e.message,
 				context: e.context,
 			})),
+			tokenUsage,
 		})
 		log('info', 'Iteration log saved to database')
 	} catch (err) {

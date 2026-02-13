@@ -15,6 +15,8 @@ export class PatchSession {
 	private readonly edits: EditOperation[] = []
 	private readonly plan: Plan
 	private roundsUsed = 0
+	private inputTokens = 0
+	private outputTokens = 0
 
 	get conversation(): Anthropic.MessageParam[] {
 		return this.fullHistory
@@ -22,6 +24,10 @@ export class PatchSession {
 
 	get exhausted(): boolean {
 		return this.roundsUsed >= config.maxBuilderRounds
+	}
+
+	getTokenUsage(): { input: number; output: number } {
+		return { input: this.inputTokens, output: this.outputTokens }
 	}
 
 	constructor(plan: Plan, memoryContext: string) {
@@ -84,6 +90,8 @@ export class PatchSession {
 			logger.info(`Builder turn ${this.roundsUsed}/${maxRounds}`)
 
 			const response = await callApi('builder', this.messages)
+			this.inputTokens += response.usage.input_tokens
+			this.outputTokens += response.usage.output_tokens
 			logger.info(`Builder turn ${this.roundsUsed} usage: ${response.usage.input_tokens} in + ${response.usage.output_tokens} out tokens`)
 
 			this.pushMessage({ role: 'assistant', content: response.content })

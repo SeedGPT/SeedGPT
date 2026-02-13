@@ -16,6 +16,7 @@ export interface Plan {
 export interface PlanResult {
 	plan: Plan
 	messages: Anthropic.MessageParam[]
+	tokenUsage: { input: number; output: number }
 }
 
 export async function plan(recentMemory: string, gitLog: string): Promise<PlanResult> {
@@ -26,11 +27,17 @@ export async function plan(recentMemory: string, gitLog: string): Promise<PlanRe
 		content: `${recentMemory}\n\n## Recent Git History\n${gitLog}\n\nReview your notes and recent memories, then submit your plan.`,
 	}]
 
+	let totalInputTokens = 0
+	let totalOutputTokens = 0
+
 	const maxRounds = config.maxPlannerRounds
 	for (let round = 0; round < maxRounds; round++) {
 		logger.info(`Planner turn ${round + 1}/${maxRounds}`)
 		const response = await callApi('planner', messages)
 		logger.info(`Planner turn ${round + 1} usage: ${response.usage.input_tokens} in + ${response.usage.output_tokens} out tokens`)
+
+		totalInputTokens += response.usage.input_tokens
+		totalOutputTokens += response.usage.output_tokens
 
 		const toolBlocks = response.content.filter(c => c.type === 'tool_use')
 		if (toolBlocks.length === 0) {
@@ -58,7 +65,7 @@ export async function plan(recentMemory: string, gitLog: string): Promise<PlanRe
 
 			logger.info(`Plan: "${input.title}" — reasoning: ${(input.plannerReasoning?.length ?? 0)} chars`)
 			messages.push({ role: 'assistant', content: response.content })
-			return { plan: input, messages }
+			return { plan: input, messages, tokenUsage: { input: totalInputTokens, output: totalOutputTokens } }
 		}
 
 		const toolResults: ToolResult[] = []

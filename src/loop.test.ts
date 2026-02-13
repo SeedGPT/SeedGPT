@@ -70,14 +70,22 @@ const mockPatchSession = {
 	fixPatch: jest.fn<(...args: unknown[]) => Promise<typeof mockEdits>>().mockResolvedValue(mockEdits),
 	get exhausted() { return mockExhausted },
 	conversation: [] as unknown[],
+	getTokenUsage: jest.fn<() => { input: number; output: number }>().mockReturnValue({ input: 2000, output: 1000 }),
 }
 
 jest.unstable_mockModule('./agents/plan.js', () => ({
-	plan: jest.fn<() => Promise<{ plan: typeof mockPlan; messages: [] }>>().mockResolvedValue({ plan: mockPlan, messages: [] }),
+	plan: jest.fn<() => Promise<{ plan: typeof mockPlan; messages: []; tokenUsage: { input: number; output: number } }>>().mockResolvedValue({ 
+		plan: mockPlan, 
+		messages: [],
+		tokenUsage: { input: 1000, output: 500 }
+	}),
 }))
 
 jest.unstable_mockModule('./agents/reflect.js', () => ({
-	reflect: jest.fn<() => Promise<string>>().mockResolvedValue('Test reflection.'),
+	reflect: jest.fn<() => Promise<{ reflection: string; tokenUsage: { input: number; output: number } }>>().mockResolvedValue({ 
+		reflection: 'Test reflection.',
+		tokenUsage: { input: 800, output: 400 }
+	}),
 }))
 
 jest.unstable_mockModule('./agents/build.js', () => ({

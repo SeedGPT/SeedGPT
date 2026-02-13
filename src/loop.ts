@@ -9,6 +9,7 @@ import logger, { writeIterationLog } from './logger.js'
 import { plan } from './agents/plan.js'
 import { PatchSession } from './agents/build.js'
 import { reflect } from './agents/reflect.js'
+import { computeCost } from './models/Generated.js'
 
 export async function run(): Promise<void> {
 	logger.info('SeedGPT starting iteration...')
@@ -43,6 +44,14 @@ async function iterate(): Promise<boolean> {
 	let iterationPlan: any
 	let branchName: string
 
+	// Token usage tracking
+	const tokenUsage = {
+		planner: { input: 0, output: 0, cost: 0 },
+		builder: { input: 0, output: 0, cost: 0 },
+		reflect: { input: 0, output: 0, cost: 0 },
+		total: { input: 0, output: 0, cost: 0 }
+	}
+
 	try {
 		await snapshotCodebase(config.workspacePath)
 		const recentMemory = await getContext()
@@ -51,6 +60,8 @@ async function iterate(): Promise<boolean> {
 		const planResult = await plan(recentMemory, gitLog)
 		iterationPlan = planResult.plan
 		plannerMessages = planResult.messages
+		tokenUsage.planner.input = planResult.tokenUsage.input
+		tokenUsage.planner.output = planResult.tokenUsage.output
 		await storePastMemory(`Planned change "${iterationPlan.title}": ${iterationPlan.description}`)
 
 		session = new PatchSession(iterationPlan, recentMemory)
@@ -125,9 +136,34 @@ async function iterate(): Promise<boolean> {
 	}
 
 	const allMessages = [...plannerMessages, ...session.conversation]
-	const reflection = await reflect(outcome, allMessages)
+	const reflectResult = await reflect(outcome, allMessages)
+	const reflection = reflectResult.reflection
+	tokenUsage.reflect.input = reflectResult.tokenUsage.input
+	tokenUsage.reflect.output = reflectResult.tokenUsage.output
+	
+	// Get builder token usage
+	const builderUsage = session.getTokenUsage()
+	tokenUsage.builder.input = builderUsage.input
+	tokenUsage.builder.output = builderUsage.output
+	
+	// Compute costs and totals
+	tokenUsage.planner.cost = computeCost(tokenUsage.planner.input, tokenUsage.planner.output)
+	tokenUsage.builder.cost = computeCost(tokenUsage.builder.input, tokenUsage.builder.output)
+	tokenUsage.reflect.cost = computeCost(tokenUsage.reflect.input, tokenUsage.reflect.output)
+	tokenUsage.total.input = tokenUsage.planner.input + tokenUsage.builder.input + tokenUsage.reflect.input
+	tokenUsage.total.output = tokenUsage.planner.output + tokenUsage.builder.output + tokenUsage.reflect.output
+	tokenUsage.total.cost = tokenUsage.planner.cost + tokenUsage.builder.cost + tokenUsage.reflect.cost
+	
 	await storePastMemory(`Self-reflection: ${reflection}`)
-	await writeIterationLog()
+	await writeIterationLog(tokenUsage)
+	
+	// Log token usage summary
+	logger.info(
+		`Iteration complete — Planner: ${tokenUsage.planner.input} input + ${tokenUsage.planner.output} output tokens ($${tokenUsage.planner.cost.toFixed(4)}), ` +
+		`Builder: ${tokenUsage.builder.input} input + ${tokenUsage.builder.output} output tokens ($${tokenUsage.builder.cost.toFixed(4)}), ` +
+		`Reflect: ${tokenUsage.reflect.input} input + ${tokenUsage.reflect.output} output tokens ($${tokenUsage.reflect.cost.toFixed(4)}), ` +
+		`Total: ${tokenUsage.total.input + tokenUsage.total.output} tokens ($${tokenUsage.total.cost.toFixed(4)})`
+	)
 
 	return merged
 }

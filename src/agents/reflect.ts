@@ -53,7 +53,7 @@ function buildTranscript(messages: Anthropic.MessageParam[]): string {
 	return parts.join('\n')
 }
 
-export async function reflect(outcome: string, messages: Anthropic.MessageParam[]): Promise<string> {
+export async function reflect(outcome: string, messages: Anthropic.MessageParam[]): Promise<{ reflection: string; tokenUsage: { input: number; output: number } }> {
 	logger.info('Self-reflecting on iteration...')
 
 	const logs = getLogBuffer()
@@ -78,5 +78,11 @@ export async function reflect(outcome: string, messages: Anthropic.MessageParam[
 
 	const text = response.content.find(c => c.type === 'text')?.text ?? ''
 	logger.info(`Reflection: ${text.slice(0, 200)}`)
-	return text.trim()
+	return {
+		reflection: text.trim(),
+		tokenUsage: {
+			input: response.usage.input_tokens,
+			output: response.usage.output_tokens,
+		},
+	}
 }
