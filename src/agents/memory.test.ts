@@ -177,4 +177,203 @@ describe('memory', () => {
 			expect(result).toContain('No memory with id')
 		})
 	})
+
+	describe('storeIdea', () => {
+		it('creates a pinned memory with idea fields', async () => {
+			const result = await memory.storeIdea(
+				'Add retry logic to API calls',
+				'Reduces failures from transient network issues'
+			)
+
+			expect(result).toContain('Idea saved')
+			expect(result).toContain('mock summary')
+
+			const ideas = await MemoryModel.find({ ideaStatus: 'pending' })
+			expect(ideas).toHaveLength(1)
+			expect(ideas[0].content).toBe('Add retry logic to API calls')
+			expect(ideas[0].ideaStatus).toBe('pending')
+			expect(ideas[0].ideaContext).toBe('Reduces failures from transient network issues')
+			expect(ideas[0].pinned).toBe(true)
+		})
+	})
+
+	describe('updateIdeaStatus', () => {
+		it('updates status to attempted', async () => {
+			const doc = await MemoryModel.create({
+				content: 'Some idea',
+				summary: 'idea summary',
+				pinned: true,
+				ideaStatus: 'pending',
+				ideaContext: 'context',
+			})
+
+			const result = await memory.updateIdeaStatus(doc._id.toString(), 'attempted')
+			expect(result).toContain('marked as attempted')
+
+			const updated = await MemoryModel.findById(doc._id)
+			expect(updated!.ideaStatus).toBe('attempted')
+			expect(updated!.pinned).toBe(true)
+		})
+
+		it('unpins idea when marked as completed', async () => {
+			const doc = await MemoryModel.create({
+				content: 'Some idea',
+				summary: 'idea summary',
+				pinned: true,
+				ideaStatus: 'pending',
+			})
+
+			const result = await memory.updateIdeaStatus(doc._id.toString(), 'completed')
+			expect(result).toContain('marked as completed')
+
+			const updated = await MemoryModel.findById(doc._id)
+			expect(updated!.ideaStatus).toBe('completed')
+			expect(updated!.pinned).toBe(false)
+		})
+
+		it('returns error for non-existent id', async () => {
+			const fakeId = new mongoose.Types.ObjectId().toString()
+			const result = await memory.updateIdeaStatus(fakeId, 'attempted')
+			expect(result).toContain('No memory found')
+		})
+
+		it('returns error for non-idea memory', async () => {
+			const doc = await MemoryModel.create({
+				content: 'Regular memory',
+				summary: 'regular',
+				pinned: false,
+			})
+
+			const result = await memory.updateIdeaStatus(doc._id.toString(), 'attempted')
+			expect(result).toContain('not an idea')
+		})
+	})
+
+	describe('getIdeas', () => {
+		it('returns pending and attempted ideas', async () => {
+			await MemoryModel.create({
+				content: 'Idea 1',
+				summary: 'First idea',
+				pinned: true,
+				ideaStatus: 'pending',
+				ideaContext: 'Important context',
+			})
+			await MemoryModel.create({
+				content: 'Idea 2',
+				summary: 'Second idea',
+				pinned: true,
+				ideaStatus: 'attempted',
+			})
+			await MemoryModel.create({
+				content: 'Idea 3',
+				summary: 'Third idea',
+				pinned: false,
+				ideaStatus: 'completed',
+			})
+
+			const result = await memory.getIdeas()
+			expect(result).toContain('[PENDING]')
+			expect(result).toContain('First idea')
+			expect(result).toContain('[ATTEMPTED]')
+			expect(result).toContain('Second idea')
+			expect(result).toContain('Important context')
+			expect(result).not.toContain('Third idea')
+		})
+
+		it('returns message when no ideas exist', async () => {
+			const result = await memory.getIdeas()
+			expect(result).toBe('No active ideas.')
+		})
+	})
+
+	describe('generateIdeas', () => {
+		it('parses JSON response from LLM', async () => {
+			mockCallApi.mockResolvedValueOnce({
+				content: [{
+					type: 'text',
+					text: '[{"description": "Add caching", "rationale": "Improves performance"}]'
+				}],
+				usage: { input_tokens: 10, output_tokens: 5 }
+			})
+
+			const ideas = await memory.generateIdeas('codebase context', 'recent memory')
+			expect(ideas).toHaveLength(1)
+			expect(ideas[0]).toContain('Add caching')
+			expect(ideas[0]).toContain('Rationale: Improves performance')
+		})
+
+		it('returns empty array on parse failure', async () => {
+			mockCallApi.mockResolvedValueOnce({
+				content: [{
+					type: 'text',
+					text: 'invalid json'
+				}],
+				usage: { input_tokens: 10, output_tokens: 5 }
+			})
+
+			const ideas = await memory.generateIdeas('codebase context', 'recent memory')
+			expect(ideas).toEqual([])
+		})
+	})
+
+	describe('getContext with ideas', () => {
+		it('includes ideas section when ideas exist', async () => {
+			await MemoryModel.create({
+				content: 'Regular note',
+				summary: 'Regular note summary',
+				pinned: true,
+			})
+			await MemoryModel.create({
+				content: 'Some idea',
+				summary: 'Idea summary',
+				pinned: true,
+				ideaStatus: 'pending',
+				ideaContext: 'Why it matters',
+			})
+
+			const context = await memory.getContext()
+			expect(context).toContain('## Notes to self')
+			expect(context).toContain('Regular note summary')
+			expect(context).toContain('## Ideas')
+			expect(context).toContain('[PENDING]')
+			expect(context).toContain('Idea summary')
+			expect(context).toContain('Why it matters')
+		})
+
+		it('does not include ideas section when no ideas exist', async () => {
+			await memory.storePinnedMemory('Regular note')
+
+			const context = await memory.getContext()
+			expect(context).toContain('## Notes to self')
+			expect(context).not.toContain('## Ideas')
+		})
+
+		it('shows both pending and attempted ideas', async () => {
+			await MemoryModel.create({
+				content: 'Pending idea',
+				summary: 'Pending',
+				pinned: true,
+				ideaStatus: 'pending',
+			})
+			await MemoryModel.create({
+				content: 'Attempted idea',
+				summary: 'Attempted',
+				pinned: true,
+				ideaStatus: 'attempted',
+			})
+			await MemoryModel.create({
+				content: 'Completed idea',
+				summary: 'Completed',
+				pinned: false,
+				ideaStatus: 'completed',
+			})
+
+			const context = await memory.getContext()
+			expect(context).toContain('[PENDING]')
+			expect(context).toContain('Pending')
+			expect(context).toContain('[ATTEMPTED]')
+			expect(context).toContain('Attempted')
+			expect(context).not.toContain('Completed')
+		})
+	})
 })
