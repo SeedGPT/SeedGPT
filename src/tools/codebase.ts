@@ -76,13 +76,11 @@ function visitNode(sf: ts.SourceFile, node: ts.Node, out: string[], indent: stri
 
 	if (ts.isFunctionDeclaration(node) && node.name) {
 		const a = mod(node, ts.SyntaxKind.AsyncKeyword) ? 'async ' : ''
-		out.push(`${indent}${exp}${a}function ${node.name.text}(${params(sf, node)})${retType(sf, node)}  [${range}]`)
+		out.push(`${indent}${exp}${a}function ${node.name.text}  [${range}]`)
 	} else if (ts.isClassDeclaration(node) && node.name) {
 		out.push(`${indent}${exp}class ${node.name.text}  [${range}]`)
-		for (const m of node.members) visitClassMember(sf, m, out, indent + '  ', expOnly)
 	} else if (ts.isInterfaceDeclaration(node)) {
 		out.push(`${indent}${exp}interface ${node.name.text}  [${range}]`)
-		for (const m of node.members) visitTypeMember(sf, m, out, indent + '  ')
 	} else if (ts.isTypeAliasDeclaration(node)) {
 		const text = node.type.getText(sf)
 		const short = text.length < 80 ? ` = ${text}` : ''
@@ -94,8 +92,7 @@ function visitNode(sf: ts.SourceFile, node: ts.Node, out: string[], indent: stri
 		const keyword = node.declarationList.flags & ts.NodeFlags.Const ? 'const' : 'let'
 		for (const d of node.declarationList.declarations) {
 			if (!ts.isIdentifier(d.name)) continue
-			const type = d.type ? `: ${d.type.getText(sf)}` : inferType(sf, d.initializer)
-			out.push(`${indent}${exp}${keyword} ${d.name.text}${type}  [${range}]`)
+			out.push(`${indent}${exp}${keyword} ${d.name.text}  [${range}]`)
 		}
 	}
 }

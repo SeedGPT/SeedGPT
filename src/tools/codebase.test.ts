@@ -16,8 +16,8 @@ function helper(): void {
 `
 		const result = extractDeclarations(src, 'test.ts')
 		expect(result).toEqual([
-			'  export function greet(name: string): string  [L1-3]',
-			'  function helper(): void  [L5-7]',
+			'  export function greet  [L1-3]',
+			'  function helper  [L5-7]',
 		])
 	})
 
@@ -28,7 +28,7 @@ function helper(): void {
 `
 		const result = extractDeclarations(src, 'test.ts')
 		expect(result).toEqual([
-			'  export async function fetchData(url: string): Promise<string>  [L1-3]',
+			'  export async function fetchData  [L1-3]',
 		])
 	})
 
@@ -42,9 +42,6 @@ function helper(): void {
 		const result = extractDeclarations(src, 'test.ts')
 		expect(result).toEqual([
 			'  export interface User  [L1-5]',
-			'    name: string',
-			'    age?: number',
-			'    greet(msg: string): void',
 		])
 	})
 
@@ -78,9 +75,9 @@ const untyped = 'hello'
 `
 		const result = extractDeclarations(src, 'test.ts')
 		expect(result).toEqual([
-			'  export const API_URL: string  [L1]',
-			'  let counter: number  [L2]',
-			'  const untyped: string  [L3]',
+			'  export const API_URL  [L1]',
+			'  let counter  [L2]',
+			'  const untyped  [L3]',
 		])
 	})
 
@@ -103,11 +100,6 @@ const untyped = 'hello'
 		const result = extractDeclarations(src, 'test.ts')
 		expect(result).toEqual([
 			'  export class Service  [L1-14]',
-			'    private readonly name: string  [L2]',
-			'    protected static count: number  [L3]',
-			'    constructor(name: string)  [L5-7]',
-			'    async fetchData(url: string): Promise<string>  [L9-11]',
-			'    static reset(): void  [L13]',
 		])
 	})
 
@@ -125,7 +117,7 @@ const untyped = 'hello'
 `
 		const result = extractDeclarations(src, 'test.ts')
 		expect(result).toEqual([
-			'  function process(required: string, optional?: number, ...rest: string[]): void  [L1]',
+			'  function process  [L1]',
 		])
 	})
 
@@ -141,8 +133,9 @@ import { foo } from 'bar'
 		const src = `function id(x: number): number { return x }
 `
 		const result = extractDeclarations(src, 'test.ts')
-		expect(result[0]).toContain('[L1]')
-		expect(result[0]).not.toContain('L1-')
+		expect(result).toEqual([
+			'  function id  [L1]',
+		])
 	})
 
 	it('infers types from initializers', () => {
@@ -158,15 +151,15 @@ const inst = new Map()
 `
 		const result = extractDeclarations(src, 'test.ts')
 		expect(result).toEqual([
-			'  const s: string  [L1]',
-			'  const t: string  [L2]',
-			'  const n: number  [L3]',
-			'  const b: boolean  [L4]',
-			'  const f: boolean  [L5]',
-			'  const a: [...]  [L6]',
-			'  const obj: { name, value }  [L7]',
-			'  const fn: (x: number) => string  [L8]',
-			'  const inst: Map  [L9]',
+			'  const s  [L1]',
+			'  const t  [L2]',
+			'  const n  [L3]',
+			'  const b  [L4]',
+			'  const f  [L5]',
+			'  const a  [L6]',
+			'  const obj  [L7]',
+			'  const fn  [L8]',
+			'  const inst  [L9]',
 		])
 	})
 
@@ -184,8 +177,8 @@ const SECRET = 'shh'
 `
 		const result = extractDeclarations(src, 'test.ts', { exportedOnly: true })
 		expect(result).toEqual([
-			'  export function greet(name: string): string  [L1-3]',
-			'  export const API: string  [L9]',
+			'  export function greet  [L1-3]',
+			'  export const API  [L9]',
 		])
 	})
 
@@ -205,9 +198,6 @@ const SECRET = 'shh'
 		const result = extractDeclarations(src, 'test.ts', { exportedOnly: true })
 		expect(result).toEqual([
 			'  export class Service  [L1-11]',
-			'    count: number  [L3]',
-			'    constructor(name: string)  [L5-7]',
-			'    fetch(): string  [L10]',
 		])
 	})
 })
@@ -230,7 +220,7 @@ describe('getDeclarationIndex', () => {
 `)
 		const result = await getDeclarationIndex(tempDir)
 		expect(result).toContain('### app.ts (4 lines)')
-		expect(result).toContain('export function main(): void  [L1-3]')
+		expect(result).toContain('export function main  [L1-3]')
 	})
 
 	it('lists .json files with line count only', async () => {
@@ -280,7 +270,7 @@ function priv(): void {}
 const SECRET = 'x'
 `)
 		const result = await getDeclarationIndex(tempDir)
-		expect(result).toContain('export function pub(): void')
+		expect(result).toContain('export function pub')
 		expect(result).not.toContain('priv')
 		expect(result).not.toContain('SECRET')
 	})
@@ -354,7 +344,7 @@ describe('getCodebaseContext', () => {
 		expect(result).toContain('## File Tree')
 		expect(result).toContain('├── a.ts')
 		expect(result).toContain('## Declarations')
-		expect(result).toContain('export function main(): void  [L2]')
+		expect(result).toContain('export function main  [L2]')
 	})
 
 	it('omits dependency graph by default', async () => {
