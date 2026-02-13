@@ -35,74 +35,82 @@ export async function run(): Promise<void> {
 }
 
 async function iterate(): Promise<boolean> {
-	await snapshotCodebase(config.workspacePath)
-	const recentMemory = await getContext()
-	const gitLog = await getRecentLog()
-
-	const { plan: iterationPlan, messages: plannerMessages } = await plan(recentMemory, gitLog)
-	await storePastMemory(`Planned change "${iterationPlan.title}": ${iterationPlan.description}`)
-
-	const session = new PatchSession(iterationPlan, recentMemory)
-	const branchName = await createBranch(iterationPlan.title)
-
-	let edits = await session.createPatch()
-	let prNumber: number | null = null
 	let merged = false
+	let prNumber: number | null = null
 	let outcome: string
+	let plannerMessages: any[]
+	let session: PatchSession
+	let iterationPlan: any
 
-	if (edits.length === 0) {
-		outcome = 'Builder produced no edits.'
-	} else {
-		await commitAndPush(iterationPlan.title)
-		prNumber = await openPR(branchName, iterationPlan.title, iterationPlan.description)
+	try {
+		await snapshotCodebase(config.workspacePath)
+		const recentMemory = await getContext()
+		const gitLog = await getRecentLog()
 
-		while (true) {
-			const result = await awaitChecks()
-			if (result.passed) {
-				merged = true
-				outcome = `PR #${prNumber} merged successfully.`
-				break
+		const planResult = await plan(recentMemory, gitLog)
+		iterationPlan = planResult.plan
+		plannerMessages = planResult.messages
+		await storePastMemory(`Planned change "${iterationPlan.title}": ${iterationPlan.description}`)
+
+		session = new PatchSession(iterationPlan, recentMemory)
+		const branchName = await createBranch(iterationPlan.title)
+
+		let edits = await session.createPatch()
+
+		if (edits.length === 0) {
+			outcome = 'Builder produced no edits.'
+		} else {
+			await commitAndPush(iterationPlan.title)
+			prNumber = await openPR(branchName, iterationPlan.title, iterationPlan.description)
+
+			while (true) {
+				const result = await awaitChecks()
+				if (result.passed) {
+					merged = true
+					outcome = `PR #${prNumber} merged successfully.`
+					break
+				}
+
+				const error = result.error ?? 'CI checks failed with unknown error'
+				if (session.exhausted) {
+					outcome = `CI failed: ${error.slice(0, 10000)}`
+					break
+				}
+
+				logger.warn(`CI failed, attempting fix: ${error.slice(0, 200)}`)
+				await storePastMemory(`CI failed for "${iterationPlan.title}" (PR #${prNumber}): ${error.slice(0, 10000)}`)
+
+				try {
+					edits = await session.fixPatch(error)
+				} catch {
+					outcome = `Builder failed to fix: ${error.slice(0, 500)}`
+					break
+				}
+
+				if (edits.length === 0) {
+					outcome = 'Builder produced no fix edits.'
+					break
+				}
+
+				await commitAndPush(`fix: ${iterationPlan.title}`)
 			}
-
-			const error = result.error ?? 'CI checks failed with unknown error'
-			if (session.exhausted) {
-				outcome = `CI failed: ${error.slice(0, 10000)}`
-				break
-			}
-
-			logger.warn(`CI failed, attempting fix: ${error.slice(0, 200)}`)
-			await storePastMemory(`CI failed for "${iterationPlan.title}" (PR #${prNumber}): ${error.slice(0, 10000)}`)
-
-			try {
-				edits = await session.fixPatch(error)
-			} catch {
-				outcome = `Builder failed to fix: ${error.slice(0, 500)}`
-				break
-			}
-
-			if (edits.length === 0) {
-				outcome = 'Builder produced no fix edits.'
-				break
-			}
-
-			await commitAndPush(`fix: ${iterationPlan.title}`)
 		}
-	}
 
-	if (merged) {
-		await mergePR(prNumber!)
-		await deleteRemoteBranch(branchName).catch(() => {})
-		await storePastMemory(`Merged PR #${prNumber}: "${iterationPlan.title}" — CI passed and change is now on main.`)
-		logger.info(`PR #${prNumber} merged.`)
+		if (merged) {
+			await mergePR(prNumber!)
+			await deleteRemoteBranch(branchName).catch(() => {})
+			await storePastMemory(`Merged PR #${prNumber}: "${iterationPlan.title}" — CI passed and change is now on main.`)
+			logger.info(`PR #${prNumber} merged.`)
 
-		const coverage = await getCoverage()
-		if (coverage) {
-			await storePastMemory(`Post-merge coverage report:\n${coverage}`)
-			logger.info('Stored coverage report in memory')
+			const coverage = await getCoverage()
+			if (coverage) {
+				await storePastMemory(`Post-merge coverage report:\n${coverage}`)
+				logger.info('Stored coverage report in memory')
+			}
 		}
+	} finally {
+		await resetWorkspace()
 	}
-
-	await resetWorkspace()
 
 	if (!merged) {
 		if (prNumber !== null) {
