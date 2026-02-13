@@ -122,13 +122,96 @@ export async function getDiff(): Promise<string> {
 	await git.raw(['add', '-N', '.'])
 	const diff = await git.diff(['--stat', '-p', 'main'])
 	if (!diff.trim()) return 'No changes compared to main.'
-	return truncateDiff(diff)
+	return abbreviateDiff(diff)
 }
 
-function truncateDiff(diff: string): string {
+function abbreviateDiff(diff: string): string {
 	const lines = diff.split('\n')
-	if (lines.length > 500) {
-		return lines.slice(0, 500).join('\n') + `\n\n(truncated — ${lines.length} total lines)`
+	const result: string[] = []
+	let i = 0
+	
+	while (i < lines.length) {
+		const line = lines[i]
+		
+		// Check if this is a file header
+		if (line.startsWith('diff --git ')) {
+			// Capture the file header
+			result.push(line)
+			i++
+			
+			// Look ahead to determine file type (created, deleted, or modified)
+			let isCreated = false
+			let isDeleted = false
+			let filePath = ''
+			
+			// Parse the next few lines to identify the file operation
+			while (i < lines.length && !lines[i].startsWith('diff --git ')) {
+				const currentLine = lines[i]
+				
+				// Detect file path and type
+				if (currentLine.startsWith('--- ')) {
+					if (currentLine.includes('/dev/null')) {
+						isCreated = true
+					} else {
+						filePath = currentLine.substring(4).replace(/^a\//, '')
+					}
+					result.push(currentLine)
+					i++
+				} else if (currentLine.startsWith('+++ ')) {
+					if (currentLine.includes('/dev/null')) {
+						isDeleted = true
+					} else {
+						filePath = currentLine.substring(4).replace(/^b\//, '')
+					}
+					result.push(currentLine)
+					i++
+					break
+				} else {
+					result.push(currentLine)
+					i++
+				}
+			}
+			
+			// Process the file content based on type
+			if (isCreated) {
+				// For created files, count lines and skip content
+				let lineCount = 0
+				while (i < lines.length && !lines[i].startsWith('diff --git ')) {
+					if (lines[i].startsWith('+') && !lines[i].startsWith('+++')) {
+						lineCount++
+					}
+					i++
+				}
+				result.push(`Created: ${filePath} (${lineCount} lines)`)
+				result.push('') // Empty line for readability
+			} else if (isDeleted) {
+				// For deleted files, skip content
+				while (i < lines.length && !lines[i].startsWith('diff --git ')) {
+					i++
+				}
+				result.push(`Deleted: ${filePath}`)
+				result.push('') // Empty line for readability
+			} else {
+				// For modified files, preserve full diff content
+				while (i < lines.length && !lines[i].startsWith('diff --git ')) {
+					result.push(lines[i])
+					i++
+				}
+			}
+		} else {
+			// Preserve non-diff lines (like stat summary at the end)
+			result.push(line)
+			i++
+		}
 	}
-	return diff
+	
+	const output = result.join('\n')
+	
+	// Apply truncation as a safety measure for extremely large diffs
+	const outputLines = output.split('\n')
+	if (outputLines.length > 500) {
+		return outputLines.slice(0, 500).join('\n') + `\n\n(truncated — ${outputLines.length} total lines)`
+	}
+	
+	return output
 }
