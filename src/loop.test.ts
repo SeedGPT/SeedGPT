@@ -186,4 +186,13 @@ describe('run', () => {
 		await expect(run()).rejects.toThrow('network error')
 		expect(database.disconnectFromDatabase).toHaveBeenCalledTimes(1)
 	})
+
+	it('resets workspace even when iteration crashes mid-process', async () => {
+		const commitAndPush = git.commitAndPush as jest.MockedFunction<typeof git.commitAndPush>
+		commitAndPush.mockRejectedValueOnce(new Error('git push failed'))
+
+		await expect(run()).rejects.toThrow('git push failed')
+		expect(git.resetWorkspace).toHaveBeenCalledTimes(1)
+		expect(database.disconnectFromDatabase).toHaveBeenCalledTimes(1)
+	})
 })
