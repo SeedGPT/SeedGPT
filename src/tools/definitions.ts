@@ -255,7 +255,7 @@ const done = {
 
 const codebaseContext = {
 	name: 'codebase_context' as const,
-	description: 'Get a high-level overview of the entire codebase: file tree, dependency graph, and all declarations (functions, classes, types, etc.) with line numbers. Use this to understand the project structure, find where things are defined, and see how modules relate to each other.',
+	description: 'Get a high-level overview of the entire codebase: file tree and all declarations (functions, classes, types, etc.) with line numbers. Use this to understand the project structure, find where things are defined, and see how modules relate to each other.',
 	input_schema: {
 		type: 'object' as const,
 		properties: {},
