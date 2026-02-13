@@ -4,6 +4,8 @@ export interface IMemory extends Document {
 	content: string
 	summary: string
 	pinned: boolean
+	ideaStatus?: 'pending' | 'attempted' | 'completed'
+	ideaContext?: string
 	createdAt: Date
 	updatedAt: Date
 }
@@ -20,6 +22,15 @@ const memorySchema = new Schema<IMemory>({
 	pinned: {
 		type: Boolean,
 		default: false,
+	},
+	ideaStatus: {
+		type: String,
+		enum: ['pending', 'attempted', 'completed'],
+		required: false,
+	},
+	ideaContext: {
+		type: String,
+		required: false,
 	},
 }, {
 	timestamps: true,

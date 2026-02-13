@@ -46,11 +46,15 @@ export async function getContext(): Promise<string> {
 	const budget = config.memoryTokenBudget
 	let tokensUsed = 0
 
-	const notes = await MemoryModel
+	// Split pinned memories into notes (non-idea) and ideas
+	const pinnedMemories = await MemoryModel
 		.find({ pinned: true })
 		.sort({ createdAt: -1 })
-		.select('_id summary')
+		.select('_id summary ideaStatus ideaContext')
 		.lean()
+
+	const notes = pinnedMemories.filter(m => !m.ideaStatus)
+	const ideas = pinnedMemories.filter(m => m.ideaStatus)
 
 	const sections: string[] = []
 
@@ -62,10 +66,25 @@ export async function getContext(): Promise<string> {
 		sections.push(notesSection)
 	}
 
+	if (ideas.length > 0) {
+		const header = '## Ideas\n'
+		const lines = ideas.map(m => {
+			const statusBadge = m.ideaStatus === 'pending' ? '[PENDING]' : '[ATTEMPTED]'
+			const context = m.ideaContext ? ` — ${m.ideaContext}` : ''
+			return `- ${statusBadge} (${m._id}) ${m.summary}${context}`
+		})
+		const ideasSection = header + lines.join('\n')
+		const ideasTokens = estimateTokens(ideasSection)
+		if (tokensUsed + ideasTokens <= budget) {
+			tokensUsed += ideasTokens
+			sections.push(ideasSection)
+		}
+	}
+
 	const remaining = budget - tokensUsed
 	if (remaining > 0) {
 		const recent = await MemoryModel
-			.find({ pinned: false })
+			.find({ pinned: false, ideaStatus: { $exists: false } })
 			.sort({ createdAt: -1 })
 			.select('_id summary createdAt')
 			.lean()
@@ -128,4 +147,91 @@ export async function recallById(id: string): Promise<string> {
 
 	const date = new Date(memory.createdAt).toISOString().slice(0, 19).replace('T', ' ')
 	return `**${memory._id}** [${date}]\n${memory.content}`
+}
+
+export async function generateIdeas(codebaseContext: string, recentMemory: string): Promise<string[]> {
+	const prompt = `You are a code improvement assistant. Based on the current state of the codebase and recent activities, generate 2-5 concrete, actionable ideas for improvements.
+
+Consider:
+- Strategic priorities from todo.md
+- Recent failures or patterns in past memories
+- Current capabilities and what's missing
+- Code quality issues or technical debt
+
+Each idea should be:
+- Specific and actionable (not vague goals)
+- Focused on a single improvement
+- Achievable in one development cycle
+
+Return ONLY a JSON array of objects, each with "description" (brief, clear statement of the idea) and "rationale" (why this matters, what problem it solves).
+
+Example format:
+[
+  {"description": "Add retry logic to GitHub API calls", "rationale": "Reduces failures from transient network issues"},
+  {"description": "Extract common test setup into shared fixtures", "rationale": "Reduces duplication across test files"}
+]
+
+Codebase Context:
+${codebaseContext}
+
+Recent Memory:
+${recentMemory}`
+
+	const response = await callApi('memory', [{ role: 'user', content: prompt }])
+	const text = response.content.find(c => c.type === 'text')?.text ?? '[]'
+	
+	try {
+		const ideas = JSON.parse(text) as Array<{ description: string; rationale: string }>
+		logger.debug(`Generated ${ideas.length} improvement ideas`)
+		return ideas.map(idea => `${idea.description}\nRationale: ${idea.rationale}`)
+	} catch {
+		logger.debug('Failed to parse ideas from LLM response')
+		return []
+	}
+}
+
+export async function storeIdea(description: string, context: string): Promise<string> {
+	const summary = await summarizeMemory(description)
+	const memory = await MemoryModel.create({
+		content: description,
+		summary,
+		pinned: true,
+		ideaStatus: 'pending',
+		ideaContext: context,
+	})
+	logger.debug(`Stored idea: ${summary.slice(0, 80)}`)
+	return `Idea saved (${memory._id}): ${summary}`
+}
+
+export async function updateIdeaStatus(id: string, status: 'attempted' | 'completed'): Promise<string> {
+	const memory = await MemoryModel.findById(id)
+	if (!memory) return `No memory found with id "${id}".`
+	if (!memory.ideaStatus) return `Memory "${id}" is not an idea.`
+	
+	memory.ideaStatus = status
+	
+	// If completed, unpin it to move to past memories
+	if (status === 'completed') {
+		memory.pinned = false
+	}
+	
+	await memory.save()
+	logger.debug(`Updated idea status to ${status}: ${memory.summary.slice(0, 80)}`)
+	return `Idea marked as ${status}: ${memory.summary}`
+}
+
+export async function getIdeas(): Promise<string> {
+	const ideas = await MemoryModel
+		.find({ ideaStatus: { $in: ['pending', 'attempted'] } })
+		.sort({ createdAt: -1 })
+		.select('_id summary ideaStatus ideaContext')
+		.lean()
+	
+	if (ideas.length === 0) return 'No active ideas.'
+	
+	return ideas.map(idea => {
+		const statusBadge = idea.ideaStatus === 'pending' ? '[PENDING]' : '[ATTEMPTED]'
+		const context = idea.ideaContext ? `\n  Context: ${idea.ideaContext}` : ''
+		return `- ${statusBadge} (${idea._id}) ${idea.summary}${context}`
+	}).join('\n')
 }
