@@ -41,6 +41,7 @@ async function iterate(): Promise<boolean> {
 	let plannerMessages: any[]
 	let session: PatchSession
 	let iterationPlan: any
+	let branchName: string
 
 	try {
 		await snapshotCodebase(config.workspacePath)
@@ -53,7 +54,7 @@ async function iterate(): Promise<boolean> {
 		await storePastMemory(`Planned change "${iterationPlan.title}": ${iterationPlan.description}`)
 
 		session = new PatchSession(iterationPlan, recentMemory)
-		const branchName = await createBranch(iterationPlan.title)
+		branchName = await createBranch(iterationPlan.title)
 
 		let edits = await session.createPatch()
 
