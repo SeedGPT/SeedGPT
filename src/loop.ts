@@ -38,9 +38,9 @@ async function iterate(): Promise<boolean> {
 	let merged = false
 	let prNumber: number | null = null
 	let outcome: string
-	let plannerMessages: any[]
-	let session: PatchSession
-	let iterationPlan: any
+	let plannerMessages: any[] = []
+	let session: PatchSession | null = null
+	let iterationPlan: any = null
 	let branchName: string
 
 	try {
@@ -114,17 +114,18 @@ async function iterate(): Promise<boolean> {
 	}
 
 	if (!merged) {
+		const planTitle = iterationPlan?.title ?? '(early failure)'
 		if (prNumber !== null) {
 			await closePR(prNumber)
 			await deleteRemoteBranch(branchName).catch(() => {})
-			await storePastMemory(`Closed PR #${prNumber}: "${iterationPlan.title}" — ${outcome}`)
+			await storePastMemory(`Closed PR #${prNumber}: "${planTitle}" — ${outcome}`)
 		} else {
-			await storePastMemory(`Gave up on "${iterationPlan.title}" — ${outcome}`)
+			await storePastMemory(`Gave up on "${planTitle}" — ${outcome}`)
 		}
-		logger.error(`Plan "${iterationPlan.title}" failed — starting fresh plan.`)
+		logger.error(`Plan "${planTitle}" failed — starting fresh plan.`)
 	}
 
-	const allMessages = [...plannerMessages, ...session.conversation]
+	const allMessages = [...plannerMessages, ...(session?.conversation ?? [])]
 	const reflection = await reflect(outcome, allMessages)
 	await storePastMemory(`Self-reflection: ${reflection}`)
 	await writeIterationLog()
