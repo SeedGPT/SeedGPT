@@ -84,7 +84,7 @@ export async function getContext(): Promise<string> {
 	const remaining = budget - tokensUsed
 	if (remaining > 0) {
 		const recent = await MemoryModel
-			.find({ pinned: false })
+			.find({ pinned: false, ideaStatus: { $exists: false } })
 			.sort({ createdAt: -1 })
 			.select('_id summary createdAt')
 			.lean()
