@@ -453,11 +453,12 @@ ${coverageJson}
 ${coverageJson}
 ##[endgroup]`
 		const result = extractCoverageFromLogs(log)
+		expect(result).not.toBeNull()
 		expect(result).toContain('Low coverage (<50%):')
-		const lowCoverageIndex = result.indexOf('Low coverage')
-		const lowIndex = result.indexOf('src/low.ts (10%)', lowCoverageIndex)
-		const midIndex = result.indexOf('src/mid.ts (20%)', lowCoverageIndex)
-		const highIndex = result.indexOf('src/high.ts (40%)', lowCoverageIndex)
+		const lowCoverageIndex = result!.indexOf('Low coverage')
+		const lowIndex = result!.indexOf('src/low.ts (10%)', lowCoverageIndex)
+		const midIndex = result!.indexOf('src/mid.ts (20%)', lowCoverageIndex)
+		const highIndex = result!.indexOf('src/high.ts (40%)', lowCoverageIndex)
 		expect(lowIndex).toBeLessThan(midIndex)
 		expect(midIndex).toBeLessThan(highIndex)
 	})
