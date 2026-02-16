@@ -1,5 +1,14 @@
-import { describe, it, expect } from '@jest/globals'
-import { extractFailedStepOutput, extractCoverageFromLogs } from './log-parsing.js'
+import { jest, describe, it, expect } from '@jest/globals'
+
+jest.unstable_mockModule('../config.js', () => ({
+	config: {
+		coverage: {
+			maxLowCoverageFiles: 5,
+		},
+	},
+}))
+
+const { extractFailedStepOutput, extractCoverageFromLogs } = await import('./log-parsing.js')
 
 describe('extractFailedStepOutput', () => {
 	it('extracts output from a single failed step with GitHub Actions markers', () => {
