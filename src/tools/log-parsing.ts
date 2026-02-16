@@ -1,3 +1,5 @@
+import { config } from '../config'
+
 interface CoverageMetric {
 	total: number
 	covered: number
