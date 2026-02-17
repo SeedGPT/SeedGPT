@@ -3,6 +3,7 @@ import logger from '../logger.js'
 import * as memory from '../agents/memory.js'
 import * as codebase from './codebase.js'
 import * as git from './git.js'
+import * as quality from './quality.js'
 
 export interface FileEdit {
 	type: 'replace'
@@ -259,10 +260,25 @@ const gitDiff = {
 	},
 }
 
+const analyzeCodeQuality = {
+	name: 'analyze_code_quality' as const,
+	description: 'Analyze a TypeScript file for code quality issues including cyclomatic complexity, function length, nesting depth, and parameter count. Returns warnings and errors for functions that exceed quality thresholds.',
+	input_schema: {
+		type: 'object' as const,
+		properties: {
+			filePath: {
+				type: 'string' as const,
+				description: 'Repo-relative path to the TypeScript file to analyze (e.g. "src/tools/codebase.ts")',
+			},
+		},
+		required: ['filePath'],
+	},
+}
+
 // Planner gets read-only tools + memory + submit_plan. Builder gets mutation tools + done.
 // This enforces the architectural separation: the planner decides WHAT to change,
 // the builder decides HOW to implement it. Neither can do the other's job.
-export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, readFile, grepSearch, fileSearch, listDirectory]
+export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, readFile, grepSearch, fileSearch, listDirectory, analyzeCodeQuality]
 export const BUILDER_TOOLS = [editFile, createFile, deleteFile, readFile, grepSearch, fileSearch, listDirectory, gitDiff, done]
 
 export async function handleTool(name: string, input: Record<string, unknown>, id: string): Promise<ToolResult> {
@@ -356,6 +372,25 @@ export async function handleTool(name: string, input: Record<string, unknown>, i
 		const diffLines = result.split('\n').length
 		logger.info(`  → ${diffLines} line${diffLines !== 1 ? 's' : ''} of diff`)
 		return { type: 'tool_result', tool_use_id: id, content: result }
+	}
+
+	if (name === 'analyze_code_quality') {
+		const { filePath } = input as { filePath: string }
+		try {
+			const issues = await quality.analyzeCodeQuality(filePath)
+			if (issues.length === 0) {
+				logger.info(`  → No quality issues found`)
+				return { type: 'tool_result', tool_use_id: id, content: `No code quality issues found in ${filePath}` }
+			}
+			const result = issues.map(issue => {
+				const severity = issue.severity.toUpperCase()
+				return `[${severity}] ${issue.location.file}:${issue.location.line} (${issue.location.functionName})\n  ${issue.description}`
+			}).join('\n\n')
+			logger.info(`  → Found ${issues.length} issue${issues.length !== 1 ? 's' : ''}`)
+			return { type: 'tool_result', tool_use_id: id, content: result }
+		} catch (err) {
+			return { type: 'tool_result', tool_use_id: id, content: `Failed to analyze ${filePath}: ${err instanceof Error ? err.message : String(err)}`, is_error: true }
+		}
 	}
 
 	// Edit tools apply changes to the filesystem immediately so the builder's subsequent
