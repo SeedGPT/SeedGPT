@@ -222,8 +222,8 @@ describe('queryIterationHistory', () => {
 		const result = await queryIterationHistory()
 		const lines = result.split('\n')
 
-		const completeLine = lines.find(l => l.includes('complete-iter'))
-		const incompleteLine = lines.find(l => l.includes('incomplete-iter'))
+		const completeLine = lines.find(l => l.includes('complete-iter ['))
+		const incompleteLine = lines.find(l => l.includes('incomplete-iter ['))
 
 		expect(completeLine).toContain('completed')
 		expect(incompleteLine).toContain('failed')
