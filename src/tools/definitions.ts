@@ -3,6 +3,7 @@ import logger from '../logger.js'
 import * as memory from '../agents/memory.js'
 import * as codebase from './codebase.js'
 import * as git from './git.js'
+import * as history from './history.js'
 
 export interface FileEdit {
 	type: 'replace'
@@ -100,6 +101,20 @@ const recallMemory = {
 			id: {
 				type: 'string' as const,
 				description: 'A specific memory ID to look up',
+			},
+		},
+	},
+}
+
+const queryIterationHistory = {
+	name: 'query_iteration_history' as const,
+	description: 'Query recent iteration history to detect patterns and learn from past attempts. Returns a summary of recent iterations showing outcomes and what was attempted.',
+	input_schema: {
+		type: 'object' as const,
+		properties: {
+			limit: {
+				type: 'number' as const,
+				description: 'Number of recent iterations to retrieve (defaults to 5)',
 			},
 		},
 	},
@@ -262,7 +277,7 @@ const gitDiff = {
 // Planner gets read-only tools + memory + submit_plan. Builder gets mutation tools + done.
 // This enforces the architectural separation: the planner decides WHAT to change,
 // the builder decides HOW to implement it. Neither can do the other's job.
-export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, readFile, grepSearch, fileSearch, listDirectory]
+export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, queryIterationHistory, readFile, grepSearch, fileSearch, listDirectory]
 export const BUILDER_TOOLS = [editFile, createFile, deleteFile, readFile, grepSearch, fileSearch, listDirectory, gitDiff, done]
 
 export async function handleTool(name: string, input: Record<string, unknown>, id: string): Promise<ToolResult> {
@@ -349,6 +364,13 @@ export async function handleTool(name: string, input: Record<string, unknown>, i
 			return { type: 'tool_result', tool_use_id: id, content: result }
 		}
 		return { type: 'tool_result', tool_use_id: id, content: 'Provide a query or id to recall a memory.' }
+	}
+
+	if (name === 'query_iteration_history') {
+		const { limit } = input as { limit?: number }
+		logger.info(`Querying iteration history (limit: ${limit ?? 5})`)
+		const result = await history.queryIterationHistory(limit)
+		return { type: 'tool_result', tool_use_id: id, content: result }
 	}
 
 	if (name === 'git_diff') {
