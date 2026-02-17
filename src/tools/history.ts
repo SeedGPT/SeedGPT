@@ -26,7 +26,7 @@ export async function queryIterationHistory(limit: number = 5): Promise<string> 
 
 	const summaries: string[] = []
 	for (const iteration of iterations) {
-		const iterationId = iteration._id.slice(0, 8)
+		const iterationId = iteration._id
 		const date = new Date(iteration.firstCreated).toISOString().slice(0, 19).replace('T', ' ')
 		
 		// Iteration is considered complete if reflect phase exists
