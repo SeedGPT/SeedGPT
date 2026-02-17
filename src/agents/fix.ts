@@ -9,6 +9,7 @@ import { toolLogSuffix } from '../logger.js'
 interface FixContext {
 	planTitle: string
 	planDescription: string
+	planImplementation: string
 	createdFiles: string[]
 	modifiedFiles: string[]
 }
@@ -39,6 +40,8 @@ export class FixSession {
 			`You were implementing "${this.context.planTitle}": ${this.context.planDescription}`,
 			'The changes were applied but CI failed. Diagnose and fix the issue.',
 		]
+
+		sections.push(`## Original Implementation Instructions\n${this.context.planImplementation}`)
 
 		if (this.context.createdFiles.length > 0) {
 			sections.push(`Files CREATED by the builder (entirely new):\n${this.context.createdFiles.map(f => `- ${f}`).join('\n')}`)

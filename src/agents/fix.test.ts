@@ -36,6 +36,7 @@ beforeEach(() => {
 const fixContext = {
 	planTitle: 'test-change',
 	planDescription: 'A test change',
+	planImplementation: 'Detailed implementation instructions for the builder',
 	createdFiles: ['new.ts'],
 	modifiedFiles: ['existing.ts'],
 }

@@ -76,6 +76,7 @@ async function iterate(): Promise<boolean> {
 				fixer = new FixSession({
 					planTitle: iterationPlan.title,
 					planDescription: iterationPlan.description,
+					planImplementation: iterationPlan.implementation,
 					createdFiles: created,
 					modifiedFiles: modified,
 				})
