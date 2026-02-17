@@ -27,7 +27,7 @@ export async function openPR(branch: string, title: string, body: string): Promi
 	return data.number
 }
 
-export async function awaitPRChecks(sha: string): Promise<CheckResult> {
+async function awaitPRChecks(sha: string): Promise<CheckResult> {
 	const start = Date.now()
 	const { pollInterval, timeout, noChecksTimeout } = config.ci
 
@@ -132,7 +132,7 @@ export async function deleteRemoteBranch(branch: string): Promise<void> {
 
 // Only finds PRs created by this agent (prefixed with seedgpt/) to avoid
 // accidentally closing human-created PRs during stale cleanup.
-export async function findOpenAgentPRs(): Promise<Array<{ number: number, head: { ref: string, sha: string } }>> {
+async function findOpenAgentPRs(): Promise<Array<{ number: number, head: { ref: string, sha: string } }>> {
 	const { data } = await octokit.pulls.list({
 		owner, repo,
 		state: 'open',
