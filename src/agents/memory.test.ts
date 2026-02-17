@@ -24,6 +24,7 @@ jest.unstable_mockModule('../llm/api.js', () => ({
 
 const memory = await import('./memory.js')
 const MemoryModel = (await import('../models/Memory.js')).default
+const IterationLogModel = (await import('../models/IterationLog.js')).default
 
 let replSet: MongoMemoryReplSet
 
@@ -211,8 +212,6 @@ describe('memory', () => {
 	})
 
 	describe('listIterations', () => {
-		const IterationLogModel = (await import('../models/IterationLog.js')).default
-
 		beforeEach(async () => {
 			await IterationLogModel.deleteMany({})
 		})
