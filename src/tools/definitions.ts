@@ -259,10 +259,24 @@ const gitDiff = {
 	},
 }
 
+const listIterations = {
+	name: 'list_iterations' as const,
+	description: 'Query recent iteration history from the database. Returns a list of recent iterations with their ID, timestamp, and outcome (success/failure). Useful for understanding patterns across cycles.',
+	input_schema: {
+		type: 'object' as const,
+		properties: {
+			limit: {
+				type: 'number' as const,
+				description: 'Maximum number of iterations to return (default: 10)',
+			},
+		},
+	},
+}
+
 // Planner gets read-only tools + memory + submit_plan. Builder gets mutation tools + done.
 // This enforces the architectural separation: the planner decides WHAT to change,
 // the builder decides HOW to implement it. Neither can do the other's job.
-export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, readFile, grepSearch, fileSearch, listDirectory]
+export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, listIterations, readFile, grepSearch, fileSearch, listDirectory]
 export const BUILDER_TOOLS = [editFile, createFile, deleteFile, readFile, grepSearch, fileSearch, listDirectory, gitDiff, done]
 
 export async function handleTool(name: string, input: Record<string, unknown>, id: string): Promise<ToolResult> {
@@ -349,6 +363,14 @@ export async function handleTool(name: string, input: Record<string, unknown>, i
 			return { type: 'tool_result', tool_use_id: id, content: result }
 		}
 		return { type: 'tool_result', tool_use_id: id, content: 'Provide a query or id to recall a memory.' }
+	}
+
+	if (name === 'list_iterations') {
+		const { limit } = input as { limit?: number }
+		const iterationLimit = limit ?? 10
+		logger.info(`Listing recent iterations (limit: ${iterationLimit})`)
+		const result = await memory.listIterations(iterationLimit)
+		return { type: 'tool_result', tool_use_id: id, content: result }
 	}
 
 	if (name === 'git_diff') {

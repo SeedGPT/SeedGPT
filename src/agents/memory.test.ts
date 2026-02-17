@@ -24,6 +24,7 @@ jest.unstable_mockModule('../llm/api.js', () => ({
 
 const memory = await import('./memory.js')
 const MemoryModel = (await import('../models/Memory.js')).default
+const IterationLogModel = (await import('../models/IterationLog.js')).default
 
 let replSet: MongoMemoryReplSet
 
@@ -207,6 +208,81 @@ describe('memory', () => {
 			const fakeId = new mongoose.Types.ObjectId().toString()
 			const result = await memory.recallById(fakeId)
 			expect(result).toContain('No memory with id')
+		})
+	})
+
+	describe('listIterations', () => {
+		beforeEach(async () => {
+			await IterationLogModel.deleteMany({})
+		})
+
+		it('returns formatted list when iterations exist', async () => {
+			await IterationLogModel.create({
+				entries: [
+					{ timestamp: '2025-01-01T12:00:00Z', level: 'info', message: 'Build phase started' },
+					{ timestamp: '2025-01-01T12:05:00Z', level: 'info', message: 'Merged PR #123 successfully' },
+				],
+				createdAt: new Date('2025-01-01T12:00:00Z'),
+			})
+
+			await IterationLogModel.create({
+				entries: [
+					{ timestamp: '2025-01-02T10:00:00Z', level: 'info', message: 'Started new iteration' },
+					{ timestamp: '2025-01-02T10:30:00Z', level: 'error', message: 'Max turns reached, giving up' },
+				],
+				createdAt: new Date('2025-01-02T10:00:00Z'),
+			})
+
+			await IterationLogModel.create({
+				entries: [
+					{ timestamp: '2025-01-03T08:00:00Z', level: 'info', message: 'Iteration started' },
+					{ timestamp: '2025-01-03T08:45:00Z', level: 'error', message: 'CI failed after 3 attempts' },
+				],
+				createdAt: new Date('2025-01-03T08:00:00Z'),
+			})
+
+			const result = await memory.listIterations(10)
+
+			// Should return newest first (descending by createdAt)
+			expect(result).toContain('2025-01-03')
+			expect(result).toContain('2025-01-02')
+			expect(result).toContain('2025-01-01')
+
+			// Should detect different outcomes
+			expect(result).toContain('success')
+			expect(result).toContain('failure')
+		})
+
+		it('respects the limit parameter', async () => {
+			// Create 15 iterations
+			for (let i = 0; i < 15; i++) {
+				await IterationLogModel.create({
+					entries: [{ timestamp: `2025-01-${String(i + 1).padStart(2, '0')}T00:00:00Z`, level: 'info', message: 'Test' }],
+					createdAt: new Date(`2025-01-${String(i + 1).padStart(2, '0')}T00:00:00Z`),
+				})
+			}
+
+			const result = await memory.listIterations(5)
+			const lines = result.split('\n').filter(l => l.trim().length > 0)
+			expect(lines.length).toBe(5)
+		})
+
+		it('returns "No iterations found" when database is empty', async () => {
+			const result = await memory.listIterations(10)
+			expect(result).toBe('No iterations found in database.')
+		})
+
+		it('uses default limit of 10 when not provided', async () => {
+			for (let i = 0; i < 15; i++) {
+				await IterationLogModel.create({
+					entries: [{ timestamp: `2025-01-${String(i + 1).padStart(2, '0')}T00:00:00Z`, level: 'info', message: 'Test' }],
+					createdAt: new Date(`2025-01-${String(i + 1).padStart(2, '0')}T00:00:00Z`),
+				})
+			}
+
+			const result = await memory.listIterations()
+			const lines = result.split('\n').filter(l => l.trim().length > 0)
+			expect(lines.length).toBe(10)
 		})
 	})
 })

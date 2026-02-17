@@ -15,11 +15,14 @@ const mockDismissNote = jest.fn<(...args: unknown[]) => Promise<string>>().mockR
 const mockRecall = jest.fn<(...args: unknown[]) => Promise<string>>().mockResolvedValue('Memory content here.')
 const mockRecallById = jest.fn<(...args: unknown[]) => Promise<string>>().mockResolvedValue('Memory by id content.')
 
+const mockListIterations = jest.fn<(...args: unknown[]) => Promise<string>>().mockResolvedValue('[2025-01-03] 673abc123: success\n[2025-01-02] 673abc122: failure')
+
 jest.unstable_mockModule('../agents/memory.js', () => ({
 	storeNote: mockStoreNote,
 	dismissNote: mockDismissNote,
 	recall: mockRecall,
 	recallById: mockRecallById,
+	listIterations: mockListIterations,
 }))
 
 const mockReadFile = jest.fn<(root: string, path: string) => Promise<string>>()
@@ -230,6 +233,20 @@ describe('handleTool', () => {
 		it('returns message when neither query nor id given', async () => {
 			const result = await handleTool('recall_memory', {}, 'id1')
 			expect(result.content).toContain('Provide a query or id')
+		})
+	})
+
+	describe('list_iterations', () => {
+		it('lists iterations with default limit', async () => {
+			const result = await handleTool('list_iterations', {}, 'id1')
+			expect(mockListIterations).toHaveBeenCalledWith(10)
+			expect(result.content).toContain('[2025-01-03] 673abc123: success')
+		})
+
+		it('respects custom limit parameter', async () => {
+			const result = await handleTool('list_iterations', { limit: 5 }, 'id1')
+			expect(mockListIterations).toHaveBeenCalledWith(5)
+			expect(result.content).toContain('[2025-01-03] 673abc123: success')
 		})
 	})
 

@@ -1,4 +1,5 @@
 import MemoryModel from '../models/Memory.js'
+import IterationLogModel from '../models/IterationLog.js'
 import { config } from '../config.js'
 import logger from '../logger.js'
 import { callApi } from '../llm/api.js'
@@ -127,4 +128,34 @@ export async function recallById(id: string): Promise<string> {
 
 	const date = new Date(memory.createdAt).toISOString().slice(0, 19).replace('T', ' ')
 	return `**${memory._id}** [${date}]\n${memory.content}`
+}
+
+export async function listIterations(limit: number = 10): Promise<string> {
+	const iterations = await IterationLogModel
+		.find({})
+		.sort({ createdAt: -1 })
+		.limit(limit)
+		.lean()
+
+	if (iterations.length === 0) return 'No iterations found in database.'
+
+	return iterations.map(iter => {
+		const date = new Date(iter.createdAt).toISOString().slice(0, 19).replace('T', ' ')
+		
+		// Determine outcome from log entries
+		const logText = iter.entries.map(e => e.message.toLowerCase()).join(' ')
+		let outcome = 'unknown'
+		
+		if (logText.includes('merged pr') || logText.includes('merged successfully')) {
+			outcome = 'success'
+		} else if (logText.includes('max turns') || logText.includes('gave up') || logText.includes('ci failed') || logText.includes('checks failed')) {
+			outcome = 'failure'
+		} else if (logText.includes('closing pr') || logText.includes('aborting')) {
+			outcome = 'aborted'
+		} else if (logText.includes('running') || logText.includes('started')) {
+			outcome = 'in-progress'
+		}
+		
+		return `[${date}] ${iter._id}: ${outcome}`
+	}).join('\n')
 }
