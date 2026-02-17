@@ -1,7 +1,6 @@
 import { readFile } from 'fs/promises'
 import { join } from 'path'
 import ts from 'typescript'
-import { env } from '../env.js'
 
 export interface QualityIssue {
 	type: 'long-function' | 'high-complexity' | 'deep-nesting' | 'too-many-parameters'
@@ -23,7 +22,13 @@ const THRESHOLDS = {
 
 export async function analyzeCodeQuality(filePath: string, workspacePath?: string): Promise<QualityIssue[]> {
 	try {
-		const basePath = workspacePath ?? env.workspacePath
+		let basePath: string
+		if (workspacePath) {
+			basePath = workspacePath
+		} else {
+			const { env } = await import('../env.js')
+			basePath = env.workspacePath
+		}
 		const fullPath = join(basePath, filePath)
 		const content = await readFile(fullPath, 'utf-8')
 		const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
