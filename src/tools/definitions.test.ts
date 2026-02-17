@@ -42,6 +42,12 @@ jest.unstable_mockModule('./git.js', () => ({
 	getDiff: mockGetDiff,
 }))
 
+const mockQueryPerformanceMetrics = jest.fn<(...args: unknown[]) => Promise<string>>().mockResolvedValue('Metrics data')
+
+jest.unstable_mockModule('./metrics.js', () => ({
+	queryPerformanceMetrics: mockQueryPerformanceMetrics,
+}))
+
 const { handleTool, getEditOperation } = await import('./definitions.js')
 
 beforeEach(() => {
@@ -230,6 +236,21 @@ describe('handleTool', () => {
 		it('returns message when neither query nor id given', async () => {
 			const result = await handleTool('recall_memory', {}, 'id1')
 			expect(result.content).toContain('Provide a query or id')
+		})
+	})
+
+	describe('query_metrics', () => {
+		it('returns metrics for summary type', async () => {
+			mockQueryPerformanceMetrics.mockResolvedValue('Total iterations: 10\nSuccess rate: 80%')
+			const result = await handleTool('query_metrics', { metric: 'summary' }, 'id1')
+			expect(mockQueryPerformanceMetrics).toHaveBeenCalledWith('summary', 10)
+			expect(result.content).toContain('Total iterations')
+		})
+
+		it('uses provided limit parameter', async () => {
+			mockQueryPerformanceMetrics.mockResolvedValue('Token usage data')
+			const result = await handleTool('query_metrics', { metric: 'token_usage', limit: 5 }, 'id1')
+			expect(mockQueryPerformanceMetrics).toHaveBeenCalledWith('token_usage', 5)
 		})
 	})
 

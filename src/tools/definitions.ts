@@ -3,6 +3,7 @@ import logger from '../logger.js'
 import * as memory from '../agents/memory.js'
 import * as codebase from './codebase.js'
 import * as git from './git.js'
+import { queryPerformanceMetrics } from './metrics.js'
 
 export interface FileEdit {
 	type: 'replace'
@@ -102,6 +103,26 @@ const recallMemory = {
 				description: 'A specific memory ID to look up',
 			},
 		},
+	},
+}
+
+const queryMetrics = {
+	name: 'query_metrics' as const,
+	description: 'Query performance metrics from past iterations. Returns statistics about success rates, token usage, costs, and recent activity. Use this to understand your own performance trends before deciding what to improve next.',
+	input_schema: {
+		type: 'object' as const,
+		properties: {
+			metric: {
+				type: 'string' as const,
+				enum: ['summary', 'token_usage', 'recent_iterations', 'reflections'],
+				description: 'Type of metric to query. "summary": Overall stats (total iterations, success rate, total cost). "token_usage": Token consumption trends over last N iterations. "recent_iterations": Details of most recent iterations including outcomes. "reflections": Recent reflection content.',
+			},
+			limit: {
+				type: 'number' as const,
+				description: 'How many recent records to include for time-series queries (default: 10)',
+			},
+		},
+		required: ['metric'],
 	},
 }
 
@@ -262,7 +283,7 @@ const gitDiff = {
 // Planner gets read-only tools + memory + submit_plan. Builder gets mutation tools + done.
 // This enforces the architectural separation: the planner decides WHAT to change,
 // the builder decides HOW to implement it. Neither can do the other's job.
-export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, readFile, grepSearch, fileSearch, listDirectory]
+export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, queryMetrics, readFile, grepSearch, fileSearch, listDirectory]
 export const BUILDER_TOOLS = [editFile, createFile, deleteFile, readFile, grepSearch, fileSearch, listDirectory, gitDiff, done]
 
 export async function handleTool(name: string, input: Record<string, unknown>, id: string): Promise<ToolResult> {
@@ -349,6 +370,13 @@ export async function handleTool(name: string, input: Record<string, unknown>, i
 			return { type: 'tool_result', tool_use_id: id, content: result }
 		}
 		return { type: 'tool_result', tool_use_id: id, content: 'Provide a query or id to recall a memory.' }
+	}
+
+	if (name === 'query_metrics') {
+		const { metric, limit } = input as { metric: string; limit?: number }
+		logger.info(`Querying metrics: ${metric} (limit: ${limit ?? 10})`)
+		const result = await queryPerformanceMetrics(metric, limit)
+		return { type: 'tool_result', tool_use_id: id, content: result }
 	}
 
 	if (name === 'git_diff') {
