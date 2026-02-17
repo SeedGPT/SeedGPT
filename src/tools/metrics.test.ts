@@ -1,13 +1,13 @@
 import { jest, describe, it, expect, beforeEach } from '@jest/globals'
 
 // Mock mongoose models
-const mockGeneratedFind = jest.fn()
-const mockGeneratedCountDocuments = jest.fn()
-const mockGeneratedDistinct = jest.fn()
+const mockGeneratedFind = jest.fn<any>()
+const mockGeneratedCountDocuments = jest.fn<any>()
+const mockGeneratedDistinct = jest.fn<any>()
 
-const mockMemoryFind = jest.fn()
+const mockMemoryFind = jest.fn<any>()
 
-const mockIterationLogFind = jest.fn()
+const mockIterationLogFind = jest.fn<any>()
 
 jest.unstable_mockModule('../models/Generated.js', () => ({
 	default: {
@@ -15,7 +15,7 @@ jest.unstable_mockModule('../models/Generated.js', () => ({
 		countDocuments: mockGeneratedCountDocuments,
 		distinct: mockGeneratedDistinct,
 	},
-	computeCost: jest.fn(),
+	computeCost: jest.fn<any>(),
 }))
 
 jest.unstable_mockModule('../models/Memory.js', () => ({
@@ -44,8 +44,8 @@ describe('queryPerformanceMetrics', () => {
 			
 			// Mock aggregate for cost sum
 			mockGeneratedFind.mockReturnValue({
-				select: jest.fn().mockReturnValue({
-					exec: jest.fn().mockResolvedValue([
+				select: jest.fn<any>().mockReturnValue({
+					exec: jest.fn<any>().mockResolvedValue([
 						{ cost: 1.5 },
 						{ cost: 2.0 },
 						{ cost: 0.5 },
@@ -54,8 +54,8 @@ describe('queryPerformanceMetrics', () => {
 			})
 
 			mockMemoryFind.mockReturnValue({
-				select: jest.fn().mockReturnValue({
-					exec: jest.fn().mockResolvedValue([
+				select: jest.fn<any>().mockReturnValue({
+					exec: jest.fn<any>().mockResolvedValue([
 						{ content: 'Successfully completed task' },
 						{ content: 'Failed to build' },
 					]),
@@ -75,13 +75,13 @@ describe('queryPerformanceMetrics', () => {
 			mockGeneratedCountDocuments.mockResolvedValue(0)
 			mockGeneratedDistinct.mockResolvedValue([])
 			mockGeneratedFind.mockReturnValue({
-				select: jest.fn().mockReturnValue({
-					exec: jest.fn().mockResolvedValue([]),
+				select: jest.fn<any>().mockReturnValue({
+					exec: jest.fn<any>().mockResolvedValue([]),
 				}),
 			})
 			mockMemoryFind.mockReturnValue({
-				select: jest.fn().mockReturnValue({
-					exec: jest.fn().mockResolvedValue([]),
+				select: jest.fn<any>().mockReturnValue({
+					exec: jest.fn<any>().mockResolvedValue([]),
 				}),
 			})
 
@@ -125,10 +125,10 @@ describe('queryPerformanceMetrics', () => {
 			]
 
 			mockGeneratedFind.mockReturnValue({
-				sort: jest.fn().mockReturnValue({
-					limit: jest.fn().mockReturnValue({
-						select: jest.fn().mockReturnValue({
-							exec: jest.fn().mockResolvedValue(mockData),
+				sort: jest.fn<any>().mockReturnValue({
+					limit: jest.fn<any>().mockReturnValue({
+						select: jest.fn<any>().mockReturnValue({
+							exec: jest.fn<any>().mockResolvedValue(mockData),
 						}),
 					}),
 				}),
@@ -144,14 +144,14 @@ describe('queryPerformanceMetrics', () => {
 		})
 
 		it('should respect the limit parameter', async () => {
-			const mockLimit = jest.fn().mockReturnValue({
-				select: jest.fn().mockReturnValue({
-					exec: jest.fn().mockResolvedValue([]),
+			const mockLimit = jest.fn<any>().mockReturnValue({
+				select: jest.fn<any>().mockReturnValue({
+					exec: jest.fn<any>().mockResolvedValue([]),
 				}),
 			})
 
 			mockGeneratedFind.mockReturnValue({
-				sort: jest.fn().mockReturnValue({
+				sort: jest.fn<any>().mockReturnValue({
 					limit: mockLimit,
 				}),
 			})
@@ -175,9 +175,9 @@ describe('queryPerformanceMetrics', () => {
 			]
 
 			mockIterationLogFind.mockReturnValue({
-				sort: jest.fn().mockReturnValue({
-					limit: jest.fn().mockReturnValue({
-						exec: jest.fn().mockResolvedValue(mockLogs),
+				sort: jest.fn<any>().mockReturnValue({
+					limit: jest.fn<any>().mockReturnValue({
+						exec: jest.fn<any>().mockResolvedValue(mockLogs),
 					}),
 				}),
 			})
@@ -191,9 +191,9 @@ describe('queryPerformanceMetrics', () => {
 
 		it('should handle no iterations', async () => {
 			mockIterationLogFind.mockReturnValue({
-				sort: jest.fn().mockReturnValue({
-					limit: jest.fn().mockReturnValue({
-						exec: jest.fn().mockResolvedValue([]),
+				sort: jest.fn<any>().mockReturnValue({
+					limit: jest.fn<any>().mockReturnValue({
+						exec: jest.fn<any>().mockResolvedValue([]),
 					}),
 				}),
 			})
@@ -220,10 +220,10 @@ describe('queryPerformanceMetrics', () => {
 			]
 
 			mockMemoryFind.mockReturnValue({
-				sort: jest.fn().mockReturnValue({
-					limit: jest.fn().mockReturnValue({
-						select: jest.fn().mockReturnValue({
-							exec: jest.fn().mockResolvedValue(mockReflections),
+				sort: jest.fn<any>().mockReturnValue({
+					limit: jest.fn<any>().mockReturnValue({
+						select: jest.fn<any>().mockReturnValue({
+							exec: jest.fn<any>().mockResolvedValue(mockReflections),
 						}),
 					}),
 				}),
@@ -238,10 +238,10 @@ describe('queryPerformanceMetrics', () => {
 
 		it('should handle no reflections', async () => {
 			mockMemoryFind.mockReturnValue({
-				sort: jest.fn().mockReturnValue({
-					limit: jest.fn().mockReturnValue({
-						select: jest.fn().mockReturnValue({
-							exec: jest.fn().mockResolvedValue([]),
+				sort: jest.fn<any>().mockReturnValue({
+					limit: jest.fn<any>().mockReturnValue({
+						select: jest.fn<any>().mockReturnValue({
+							exec: jest.fn<any>().mockResolvedValue([]),
 						}),
 					}),
 				}),
