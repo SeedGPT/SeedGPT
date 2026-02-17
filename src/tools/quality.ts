@@ -21,9 +21,10 @@ const THRESHOLDS = {
 	maxParameters: 5,
 }
 
-export async function analyzeCodeQuality(filePath: string): Promise<QualityIssue[]> {
+export async function analyzeCodeQuality(filePath: string, workspacePath?: string): Promise<QualityIssue[]> {
 	try {
-		const fullPath = join(env.workspacePath, filePath)
+		const basePath = workspacePath ?? env.workspacePath
+		const fullPath = join(basePath, filePath)
 		const content = await readFile(fullPath, 'utf-8')
 		const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
 		

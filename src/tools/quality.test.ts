@@ -3,22 +3,15 @@ import { mkdtemp, writeFile, rm } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { analyzeCodeQuality } from './quality.js'
-import { env } from '../env.js'
 
 describe('analyzeCodeQuality', () => {
 	let tempDir: string
-	let originalWorkspacePath: string
 
 	beforeEach(async () => {
 		tempDir = await mkdtemp(join(tmpdir(), 'seedgpt-quality-'))
-		originalWorkspacePath = env.workspacePath
-		// @ts-expect-error - mutating env for test
-		env.workspacePath = tempDir
 	})
 
 	afterEach(async () => {
-		// @ts-expect-error - restoring env after test
-		env.workspacePath = originalWorkspacePath
 		await rm(tempDir, { recursive: true, force: true })
 	})
 
@@ -32,7 +25,7 @@ export function add(a: number, b: number): number {
 }
 `
 		await writeFile(join(tempDir, 'clean.ts'), code)
-		const issues = await analyzeCodeQuality('clean.ts')
+		const issues = await analyzeCodeQuality('clean.ts', tempDir)
 		expect(issues).toEqual([])
 	})
 
@@ -45,7 +38,7 @@ export function add(a: number, b: number): number {
 		const code = lines.join('\n')
 		
 		await writeFile(join(tempDir, 'long.ts'), code)
-		const issues = await analyzeCodeQuality('long.ts')
+		const issues = await analyzeCodeQuality('long.ts', tempDir)
 		
 		const longFunctionIssue = issues.find(i => i.type === 'long-function')
 		expect(longFunctionIssue).toBeDefined()
@@ -80,7 +73,7 @@ export function add(a: number, b: number): number {
 }
 `
 		await writeFile(join(tempDir, 'complex.ts'), code)
-		const issues = await analyzeCodeQuality('complex.ts')
+		const issues = await analyzeCodeQuality('complex.ts', tempDir)
 		
 		const complexityIssue = issues.find(i => i.type === 'high-complexity')
 		expect(complexityIssue).toBeDefined()
@@ -106,7 +99,7 @@ export function add(a: number, b: number): number {
 }
 `
 		await writeFile(join(tempDir, 'nested.ts'), code)
-		const issues = await analyzeCodeQuality('nested.ts')
+		const issues = await analyzeCodeQuality('nested.ts', tempDir)
 		
 		const nestingIssue = issues.find(i => i.type === 'deep-nesting')
 		expect(nestingIssue).toBeDefined()
@@ -128,7 +121,7 @@ export function add(a: number, b: number): number {
 }
 `
 		await writeFile(join(tempDir, 'params.ts'), code)
-		const issues = await analyzeCodeQuality('params.ts')
+		const issues = await analyzeCodeQuality('params.ts', tempDir)
 		
 		const paramsIssue = issues.find(i => i.type === 'too-many-parameters')
 		expect(paramsIssue).toBeDefined()
@@ -143,7 +136,7 @@ export function add(a: number, b: number): number {
 }
 `
 		await writeFile(join(tempDir, 'logical.ts'), code)
-		const issues = await analyzeCodeQuality('logical.ts')
+		const issues = await analyzeCodeQuality('logical.ts', tempDir)
 		
 		const complexityIssue = issues.find(i => i.type === 'high-complexity')
 		expect(complexityIssue).toBeDefined()
@@ -169,7 +162,7 @@ export function add(a: number, b: number): number {
 }
 `
 		await writeFile(join(tempDir, 'loops.ts'), code)
-		const issues = await analyzeCodeQuality('loops.ts')
+		const issues = await analyzeCodeQuality('loops.ts', tempDir)
 		
 		const complexityIssue = issues.find(i => i.type === 'high-complexity')
 		expect(complexityIssue).toBeDefined()
@@ -204,7 +197,7 @@ export function add(a: number, b: number): number {
 }
 `
 		await writeFile(join(tempDir, 'switch.ts'), code)
-		const issues = await analyzeCodeQuality('switch.ts')
+		const issues = await analyzeCodeQuality('switch.ts', tempDir)
 		
 		const complexityIssue = issues.find(i => i.type === 'high-complexity')
 		expect(complexityIssue).toBeDefined()
@@ -216,7 +209,7 @@ export function add(a: number, b: number): number {
 }
 `
 		await writeFile(join(tempDir, 'ternary.ts'), code)
-		const issues = await analyzeCodeQuality('ternary.ts')
+		const issues = await analyzeCodeQuality('ternary.ts', tempDir)
 		
 		const complexityIssue = issues.find(i => i.type === 'high-complexity')
 		expect(complexityIssue).toBeDefined()
@@ -248,7 +241,7 @@ export function add(a: number, b: number): number {
 }
 `
 		await writeFile(join(tempDir, 'catch.ts'), code)
-		const issues = await analyzeCodeQuality('catch.ts')
+		const issues = await analyzeCodeQuality('catch.ts', tempDir)
 		
 		const complexityIssue = issues.find(i => i.type === 'high-complexity')
 		expect(complexityIssue).toBeDefined()
@@ -260,7 +253,7 @@ export function add(a: number, b: number): number {
 }
 `
 		await writeFile(join(tempDir, 'arrow.ts'), code)
-		const issues = await analyzeCodeQuality('arrow.ts')
+		const issues = await analyzeCodeQuality('arrow.ts', tempDir)
 		
 		const paramsIssue = issues.find(i => i.type === 'too-many-parameters')
 		expect(paramsIssue).toBeDefined()
@@ -275,7 +268,7 @@ export function add(a: number, b: number): number {
 }
 `
 		await writeFile(join(tempDir, 'class.ts'), code)
-		const issues = await analyzeCodeQuality('class.ts')
+		const issues = await analyzeCodeQuality('class.ts', tempDir)
 		
 		const paramsIssue = issues.find(i => i.type === 'too-many-parameters')
 		expect(paramsIssue).toBeDefined()
@@ -294,7 +287,7 @@ export function add(a: number, b: number): number {
 		const code = lines.join('\n')
 		
 		await writeFile(join(tempDir, 'problematic.ts'), code)
-		const issues = await analyzeCodeQuality('problematic.ts')
+		const issues = await analyzeCodeQuality('problematic.ts', tempDir)
 		
 		// Should have multiple issues
 		expect(issues.length).toBeGreaterThan(1)
@@ -308,14 +301,14 @@ export function add(a: number, b: number): number {
 	this is not valid typescript
 `
 		await writeFile(join(tempDir, 'broken.ts'), invalidCode)
-		const issues = await analyzeCodeQuality('broken.ts')
+		const issues = await analyzeCodeQuality('broken.ts', tempDir)
 		
 		// Should return empty array instead of throwing
 		expect(issues).toEqual([])
 	})
 
 	it('handles non-existent files gracefully', async () => {
-		const issues = await analyzeCodeQuality('does-not-exist.ts')
+		const issues = await analyzeCodeQuality('does-not-exist.ts', tempDir)
 		expect(issues).toEqual([])
 	})
 
@@ -328,7 +321,7 @@ export function problematic(a: string, b: string, c: string, d: string, e: strin
 }
 `
 		await writeFile(join(tempDir, 'linenum.ts'), code)
-		const issues = await analyzeCodeQuality('linenum.ts')
+		const issues = await analyzeCodeQuality('linenum.ts', tempDir)
 		
 		const paramsIssue = issues.find(i => i.type === 'too-many-parameters')
 		expect(paramsIssue?.location.line).toBe(4)
@@ -340,7 +333,7 @@ export function problematic(a: string, b: string, c: string, d: string, e: strin
 }
 `
 		await writeFile(join(tempDir, 'anon.ts'), code)
-		const issues = await analyzeCodeQuality('anon.ts')
+		const issues = await analyzeCodeQuality('anon.ts', tempDir)
 		
 		const paramsIssue = issues.find(i => i.type === 'too-many-parameters')
 		expect(paramsIssue?.location.functionName).toBe('<anonymous>')
