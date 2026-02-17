@@ -105,23 +105,11 @@ describe('deleteRemoteBranch', () => {
 	})
 })
 
-describe('findOpenAgentPRs', () => {
-	it('returns only PRs with seedgpt/ prefix', async () => {
-		mockPullsList.mockResolvedValue({
-			data: [
-				{ number: 1, head: { ref: 'seedgpt/fix-bug', sha: 'sha1' } },
-				{ number: 2, head: { ref: 'feature/other', sha: 'sha2' } },
-				{ number: 3, head: { ref: 'seedgpt/add-tests', sha: 'sha3' } },
-			],
-		})
-
-		const prs = await github.findOpenAgentPRs()
-		expect(prs).toHaveLength(2)
-		expect(prs.map(p => p.number)).toEqual([1, 3])
+describe('awaitChecks', () => {
+	beforeEach(() => {
+		mockGetHeadSha.mockResolvedValue('sha123')
 	})
-})
 
-describe('awaitPRChecks', () => {
 	it('returns passed when all checks succeed', async () => {
 		mockChecksListForRef.mockResolvedValue({
 			data: {
@@ -131,14 +119,14 @@ describe('awaitPRChecks', () => {
 			},
 		})
 
-		const result = await github.awaitPRChecks('sha123')
+		const result = await github.awaitChecks()
 		expect(result.passed).toBe(true)
 	})
 
 	it('returns passed when no checks appear after timeout', async () => {
 		mockChecksListForRef.mockResolvedValue({ data: { check_runs: [] } })
 
-		const result = await github.awaitPRChecks('sha123')
+		const result = await github.awaitChecks()
 		expect(result.passed).toBe(true)
 	})
 
@@ -172,7 +160,7 @@ describe('awaitPRChecks', () => {
 
 		mockDownloadJobLogs.mockResolvedValue({ data: 'log text here' })
 
-		const result = await github.awaitPRChecks('sha123')
+		const result = await github.awaitChecks()
 		expect(result.passed).toBe(false)
 		expect(result.error).toBe('Extracted error')
 		expect(mockExtractFailedStepOutput).toHaveBeenCalledWith('log text here', ['Run tests'])
@@ -189,7 +177,7 @@ describe('awaitPRChecks', () => {
 
 		mockListWorkflowRuns.mockRejectedValue(new Error('API error'))
 
-		const result = await github.awaitPRChecks('sha123')
+		const result = await github.awaitChecks()
 		expect(result.passed).toBe(false)
 		expect(result.error).toContain('Check "CI" failed')
 	})
@@ -205,7 +193,7 @@ describe('awaitPRChecks', () => {
 
 		mockListWorkflowRuns.mockRejectedValue(new Error('API error'))
 
-		const result = await github.awaitPRChecks('sha123')
+		const result = await github.awaitChecks()
 		expect(result.passed).toBe(false)
 		expect(result.error).toContain('Check "Build" failed')
 		expect(result.error).toContain('Compilation failed')
@@ -238,7 +226,7 @@ describe('awaitPRChecks', () => {
 
 		mockDownloadJobLogs.mockRejectedValue(new Error('not available'))
 
-		const result = await github.awaitPRChecks('sha123')
+		const result = await github.awaitChecks()
 		expect(result.passed).toBe(false)
 		expect(result.error).toContain('test-job')
 		expect(result.error).toContain('logs unavailable')
@@ -261,7 +249,7 @@ describe('awaitPRChecks', () => {
 				},
 			})
 
-		const result = await github.awaitPRChecks('sha123')
+		const result = await github.awaitChecks()
 		expect(result.passed).toBe(true)
 		expect(mockChecksListForRef).toHaveBeenCalledTimes(2)
 	})
@@ -275,25 +263,9 @@ describe('awaitPRChecks', () => {
 			},
 		})
 
-		const result = await github.awaitPRChecks('sha123')
+		const result = await github.awaitChecks()
 		expect(result.passed).toBe(false)
 		expect(result.error).toContain('Timed out')
-	})
-})
-
-describe('awaitChecks', () => {
-	it('uses getHeadSha and delegates to awaitPRChecks', async () => {
-		mockChecksListForRef.mockResolvedValue({
-			data: {
-				check_runs: [
-					{ status: 'completed', conclusion: 'success', name: 'ci', id: 1, output: { title: null, summary: null, text: null } },
-				],
-			},
-		})
-
-		const result = await github.awaitChecks()
-		expect(mockGetHeadSha).toHaveBeenCalled()
-		expect(result.passed).toBe(true)
 	})
 })
 
