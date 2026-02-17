@@ -1,6 +1,7 @@
 import { env } from '../env.js'
 import logger from '../logger.js'
 import * as memory from '../agents/memory.js'
+import * as analyze from '../agents/analyze.js'
 import * as codebase from './codebase.js'
 import * as git from './git.js'
 import { config } from '../config.js'
@@ -101,6 +102,24 @@ const recallMemory = {
 			id: {
 				type: 'string' as const,
 				description: 'A specific memory ID to look up',
+			},
+		},
+	},
+}
+
+const analyzeIterations = {
+	name: 'analyze_iterations' as const,
+	description: 'Analyze past iteration history to identify patterns, trends, and insights. Queries the database to compute statistics about API usage, costs, cache efficiency, and common failure patterns. Use this to understand your own performance and inform planning decisions.',
+	input_schema: {
+		type: 'object' as const,
+		properties: {
+			limit: {
+				type: 'number' as const,
+				description: 'Maximum number of iterations to analyze (default: all)',
+			},
+			since: {
+				type: 'string' as const,
+				description: 'ISO date string to analyze only iterations after this date (e.g. "2025-01-01")',
 			},
 		},
 	},
@@ -263,7 +282,7 @@ const gitDiff = {
 // Planner gets read-only tools + memory + submit_plan. Builder gets mutation tools + done.
 // This enforces the architectural separation: the planner decides WHAT to change,
 // the builder decides HOW to implement it. Neither can do the other's job.
-export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, readFile, grepSearch, fileSearch, listDirectory]
+export const PLANNER_TOOLS = [submitPlan, noteToSelf, dismissNote, recallMemory, analyzeIterations, readFile, grepSearch, fileSearch, listDirectory]
 export const BUILDER_TOOLS = [editFile, createFile, deleteFile, readFile, grepSearch, fileSearch, listDirectory, gitDiff, done]
 
 export async function handleTool(name: string, input: Record<string, unknown>, id: string): Promise<ToolResult> {
@@ -350,6 +369,17 @@ export async function handleTool(name: string, input: Record<string, unknown>, i
 			return { type: 'tool_result', tool_use_id: id, content: result }
 		}
 		return { type: 'tool_result', tool_use_id: id, content: 'Provide a query or id to recall a memory.' }
+	}
+
+	if (name === 'analyze_iterations') {
+		const { limit, since } = input as { limit?: number; since?: string }
+		logger.info(`Analyzing iterations${limit ? ` (limit: ${limit})` : ''}${since ? ` (since: ${since})` : ''}`)
+		const options: { limit?: number; since?: Date } = {}
+		if (limit) options.limit = limit
+		if (since) options.since = new Date(since)
+		const report = await analyze.analyzeIterations(options)
+		const formatted = analyze.formatAnalysisReport(report)
+		return { type: 'tool_result', tool_use_id: id, content: formatted }
 	}
 
 	if (name === 'git_diff') {
