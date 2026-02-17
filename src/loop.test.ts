@@ -153,6 +153,7 @@ describe('run', () => {
 		expect(fixModule.FixSession).toHaveBeenCalledWith({
 			planTitle: 'test-change',
 			planDescription: 'A test change',
+			planImplementation: 'test implementation',
 			createdFiles: ['src/index.test.ts'],
 			modifiedFiles: ['src/index.ts'],
 		})
