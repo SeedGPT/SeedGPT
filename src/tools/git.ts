@@ -98,8 +98,39 @@ export async function getHeadSha(): Promise<string> {
 }
 
 export async function getRecentLog(count = config.git.recentLogCount): Promise<string> {
-	const log = await getClient().log({ maxCount: count })
-	return log.all.map(c => `${c.hash.slice(0, 7)} ${c.message}`).join('\n')
+	const raw = await getClient().raw(['log', '--name-only', `--format=%h %s`, `-${count}`])
+	return parseRecentLog(raw)
+}
+
+function parseRecentLog(raw: string): string {
+	const entries: string[] = []
+	let currentCommit: string | null = null
+	let currentFiles: string[] = []
+
+	function flush(): void {
+		if (currentCommit === null) return
+		if (currentFiles.length === 0) {
+			entries.push(currentCommit)
+		} else if (currentFiles.length > 5) {
+			entries.push(`${currentCommit}\n  ${currentFiles.slice(0, 5).join(', ')} (+ ${currentFiles.length - 5} more)`)
+		} else {
+			entries.push(`${currentCommit}\n  ${currentFiles.join(', ')}`)
+		}
+		currentCommit = null
+		currentFiles = []
+	}
+
+	for (const line of raw.split('\n')) {
+		if (/^[0-9a-f]+ /.test(line)) {
+			flush()
+			currentCommit = line
+		} else if (line.trim() !== '') {
+			currentFiles.push(line.trim())
+		}
+	}
+	flush()
+
+	return entries.join('\n')
 }
 
 export async function resetWorkspace(): Promise<void> {

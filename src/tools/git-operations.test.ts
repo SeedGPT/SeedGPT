@@ -106,10 +106,18 @@ describe('getHeadSha', () => {
 })
 
 describe('getRecentLog', () => {
-	it('returns formatted log entries', async () => {
+	it('returns formatted log entries with file names', async () => {
 		await git.cloneRepo()
+		mockGitClient.raw.mockResolvedValueOnce('abc1234 test commit\n\nfoo.ts\nbar.ts\n' as never)
 		const log = await git.getRecentLog()
-		expect(log).toBe('abc1234 test commit')
+		expect(log).toBe('abc1234 test commit\n  foo.ts, bar.ts')
+	})
+
+	it('truncates file list when commit touches more than 5 files', async () => {
+		await git.cloneRepo()
+		mockGitClient.raw.mockResolvedValueOnce('abc1234 test commit\n\nfile1.ts\nfile2.ts\nfile3.ts\nfile4.ts\nfile5.ts\nfile6.ts\nfile7.ts\n' as never)
+		const log = await git.getRecentLog()
+		expect(log).toBe('abc1234 test commit\n  file1.ts, file2.ts, file3.ts, file4.ts, file5.ts (+ 2 more)')
 	})
 })
 
