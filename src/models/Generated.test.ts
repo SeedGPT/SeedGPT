@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals'
-import { computeCost } from './Generated.js'
+import { computeCost, stripSignature, stripSignaturesFromRecord } from './Generated.js'
 
 describe('computeCost', () => {
 	it('computes cost for claude-sonnet-4-6 without caching', () => {
@@ -94,5 +94,63 @@ describe('computeCost', () => {
 		const regular = computeCost('claude-sonnet-4-6', usage)
 		const batch = computeCost('claude-sonnet-4-6', usage, { batch: true })
 		expect(batch).toBeCloseTo(regular * 0.5)
+	})
+})
+
+describe('stripSignature', () => {
+	it('removes signature from a thinking block', () => {
+		const block = { type: 'thinking', thinking: 'some thought', signature: 'abc123' }
+		const result = stripSignature(block)
+		expect(result).toEqual({ type: 'thinking', thinking: 'some thought' })
+	})
+
+	it('returns thinking block unchanged when no signature field', () => {
+		const block = { type: 'thinking', thinking: 'some thought' }
+		const result = stripSignature(block)
+		expect(result).toEqual({ type: 'thinking', thinking: 'some thought' })
+	})
+
+	it('returns non-thinking block unchanged', () => {
+		const block = { type: 'text', text: 'hello', signature: 'shouldStay' }
+		const result = stripSignature(block)
+		expect(result).toEqual({ type: 'text', text: 'hello', signature: 'shouldStay' })
+	})
+})
+
+describe('stripSignaturesFromRecord', () => {
+	it('strips signature from thinking block in assistant message content', () => {
+		const doc = {
+			messages: [
+				{ role: 'assistant', content: [{ type: 'thinking', thinking: 'thought', signature: 'sig1' }] },
+			],
+			response: [],
+		}
+		stripSignaturesFromRecord(doc)
+		expect((doc.messages as { role: string; content: { type: string; thinking: string }[] }[])[0].content[0]).toEqual({ type: 'thinking', thinking: 'thought' })
+	})
+
+	it('leaves non-assistant messages unchanged', () => {
+		const doc = {
+			messages: [
+				{ role: 'user', content: [{ type: 'thinking', signature: 'sig' }] },
+			],
+			response: [],
+		}
+		stripSignaturesFromRecord(doc)
+		expect((doc.messages as { role: string; content: { signature: string }[] }[])[0].content[0]).toEqual({ type: 'thinking', signature: 'sig' })
+	})
+
+	it('strips signature from thinking block in response', () => {
+		const doc = {
+			messages: [],
+			response: [{ type: 'thinking', thinking: 'resp thought', signature: 'sig2' }],
+		}
+		stripSignaturesFromRecord(doc)
+		expect((doc.response as { type: string; thinking: string }[])[0]).toEqual({ type: 'thinking', thinking: 'resp thought' })
+	})
+
+	it('does not throw when messages or response is not an array', () => {
+		const doc = { messages: null, response: null }
+		expect(() => stripSignaturesFromRecord(doc as unknown as { messages: unknown; response: unknown })).not.toThrow()
 	})
 })
