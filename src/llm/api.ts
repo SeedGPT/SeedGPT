@@ -41,8 +41,21 @@ async function buildParams(phase: Phase, messages: Anthropic.MessageParam[], too
 	const extras = PHASE_EXTRAS[phase]
 	const system: Anthropic.TextBlockParam[] = []
 
+	// Block 0: Base system prompt
 	system.push({ type: 'text', text: extras.system })
 
+	// Block 1: Codebase context (stable, large content - cache marker goes here)
+	let cacheMarkerIndex = 0
+	if (phase === 'builder' || phase === 'fixer' || phase === 'planner') {
+		const codebaseContext = await getCodebaseContext(env.workspacePath)
+		system.push({ type: 'text', text: `\n\n${codebaseContext}`, cache_control: { type: 'ephemeral' as const } })
+		cacheMarkerIndex = system.length - 1
+	} else {
+		// For phases without codebase context (memory, reflect), cache the base system prompt
+		system[0].cache_control = { type: 'ephemeral' as const }
+	}
+
+	// Dynamic content blocks (appended after cache marker)
 	if (phase === 'planner') {
 		const coverage = await getLatestMainCoverage()
 		if (coverage) {
@@ -50,14 +63,6 @@ async function buildParams(phase: Phase, messages: Anthropic.MessageParam[], too
 		}
 		const gitLog = await getRecentLog()
 		system.push({ type: 'text', text: `\n\nRecent git log:\n${gitLog}` })
-	}
-
-	if (phase === 'builder' || phase === 'fixer' || phase === 'planner') {
-		const codebaseContext = await getCodebaseContext(env.workspacePath)
-		system.push({ type: 'text', text: `\n\n${codebaseContext}` })
-	}
-
-	if (phase === 'planner') {
 		const memoryContext = await getMemoryContext()
 		system.push({ type: 'text', text: `\n\n${memoryContext}` })
 		const unusedFunctions = await findUnusedFunctions(env.workspacePath)
@@ -66,8 +71,7 @@ async function buildParams(phase: Phase, messages: Anthropic.MessageParam[], too
 		}
 	}
 
-	system[system.length - 1].cache_control = { type: 'ephemeral' as const }
-
+	// Working context (session-specific, always last)
 	if (workingContext) {
 		system.push({ type: 'text', text: `\n\n${workingContext}` })
 	}
