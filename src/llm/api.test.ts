@@ -102,7 +102,7 @@ jest.unstable_mockModule('@anthropic-ai/sdk', () => {
 	}
 })
 
-const { callApi, callBatchApi } = await import('./api.js')
+const { callApi } = await import('./api.js')
 
 const fakeUsage = { input_tokens: 100, output_tokens: 50 }
 
@@ -301,108 +301,5 @@ describe('callApi', () => {
 		const result = await callApi('reflect', [{ role: 'user', content: 'test' }])
 		expect(result).toBe(fakeMessage)
 		expect(mockBatchRetrieve).toHaveBeenCalledTimes(2)
-	})
-})
-
-describe('callBatchApi', () => {
-	it('submits batch, polls until ended, and returns ordered results', async () => {
-		mockBatchCreate.mockImplementation(async ({ requests }: { requests: Array<{ custom_id: string }> }) => {
-			return { id: 'batch_1', processing_status: 'in_progress', _requestIds: requests.map(r => r.custom_id) }
-		})
-		mockBatchRetrieve.mockResolvedValue({ id: 'batch_1', processing_status: 'ended' })
-		mockBatchResults.mockImplementation(async () => {
-			const ids = mockBatchCreate.mock.calls[0][0].requests.map((r: { custom_id: string }) => r.custom_id)
-			return (async function*() { yield* yieldSucceeded(ids, [fakeMessage]) })()
-		})
-
-		const results = await callBatchApi([{ phase: 'reflect', messages: [{ role: 'user', content: 'test' }] }])
-
-		expect(results).toHaveLength(1)
-		expect(results[0]).toBe(fakeMessage)
-		expect(mockBatchCreate).toHaveBeenCalledTimes(1)
-	})
-
-	it('polls multiple times until ended', async () => {
-		mockBatchCreate.mockImplementation(async ({ requests }: { requests: Array<{ custom_id: string }> }) => {
-			return { id: 'batch_1', processing_status: 'in_progress', _requestIds: requests.map(r => r.custom_id) }
-		})
-		mockBatchRetrieve
-			.mockResolvedValueOnce({ id: 'batch_1', processing_status: 'in_progress' })
-			.mockResolvedValueOnce({ id: 'batch_1', processing_status: 'ended' })
-		mockBatchResults.mockImplementation(async () => {
-			const ids = mockBatchCreate.mock.calls[0][0].requests.map((r: { custom_id: string }) => r.custom_id)
-			return (async function*() { yield* yieldSucceeded(ids, [fakeMessage]) })()
-		})
-
-		const results = await callBatchApi([{ phase: 'reflect', messages: [{ role: 'user', content: 'test' }] }])
-
-		expect(results).toHaveLength(1)
-		expect(mockBatchRetrieve).toHaveBeenCalledTimes(2)
-	})
-
-	it('skips polling when batch is already ended', async () => {
-		mockBatchCreate.mockImplementation(async ({ requests }: { requests: Array<{ custom_id: string }> }) => {
-			return { id: 'batch_1', processing_status: 'ended', _requestIds: requests.map(r => r.custom_id) }
-		})
-		mockBatchResults.mockImplementation(async () => {
-			const ids = mockBatchCreate.mock.calls[0][0].requests.map((r: { custom_id: string }) => r.custom_id)
-			return (async function*() { yield* yieldSucceeded(ids, [fakeMessage]) })()
-		})
-
-		await callBatchApi([{ phase: 'reflect', messages: [{ role: 'user', content: 'test' }] }])
-
-		expect(mockBatchRetrieve).not.toHaveBeenCalled()
-	})
-
-	it('throws on errored batch result', async () => {
-		mockBatchCreate.mockResolvedValue({ id: 'batch_1', processing_status: 'ended' })
-		mockBatchResults.mockImplementation(async () => {
-			return (async function*() {
-				yield { custom_id: 'req-0', result: { type: 'errored', error: { type: 'server_error', message: 'fail' } } }
-			})()
-		})
-
-		await expect(
-			callBatchApi([{ phase: 'reflect', messages: [{ role: 'user', content: 'test' }] }])
-		).rejects.toThrow('failed')
-	})
-
-	it('returns multiple results in input order and records each', async () => {
-		const fakeMessage2 = { ...fakeMessage, id: 'msg_2' }
-		mockBatchCreate.mockImplementation(async ({ requests }: { requests: Array<{ custom_id: string }> }) => {
-			return { id: 'batch_1', processing_status: 'ended', _requestIds: requests.map(r => r.custom_id) }
-		})
-		mockBatchResults.mockImplementation(async () => {
-			const ids = mockBatchCreate.mock.calls[0][0].requests.map((r: { custom_id: string }) => r.custom_id)
-			return (async function*() { yield* yieldSucceeded(ids, [fakeMessage, fakeMessage2]) })()
-		})
-
-		const results = await callBatchApi([
-			{ phase: 'reflect', messages: [{ role: 'user', content: 'a' }] },
-			{ phase: 'memory', messages: [{ role: 'user', content: 'b' }] },
-		])
-
-		expect(results).toHaveLength(2)
-		expect(results[0]).toBe(fakeMessage)
-		expect(results[1]).toBe(fakeMessage2)
-		expect(mockModelCreate).toHaveBeenCalledTimes(2)
-		expect(mockComputeCost).toHaveBeenCalledWith('claude-haiku-4-5', fakeUsage, { batch: true })
-	})
-
-	it('throws when results are missing', async () => {
-		mockBatchCreate.mockResolvedValue({ id: 'batch_1', processing_status: 'ended' })
-		mockBatchResults.mockImplementation(async () => {
-			return (async function*() {})()
-		})
-
-		await expect(
-			callBatchApi([{ phase: 'reflect', messages: [{ role: 'user', content: 'test' }] }])
-		).rejects.toThrow('missing results')
-	})
-
-	it('returns empty array for empty input', async () => {
-		const results = await callBatchApi([])
-		expect(results).toEqual([])
-		expect(mockBatchCreate).not.toHaveBeenCalled()
 	})
 })

@@ -29,7 +29,6 @@ const mockCallApi = jest.fn<((...args: unknown[]) => Promise<{ content: Array<{ 
 
 jest.unstable_mockModule('../llm/api.js', () => ({
 	callApi: mockCallApi,
-	callBatchApi: jest.fn(),
 }))
 
 const { reflect } = await import('./reflect.js')

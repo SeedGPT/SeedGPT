@@ -24,7 +24,6 @@ const mockCallApi = jest.fn<(phase: string, messages: Anthropic.MessageParam[]) 
 
 jest.unstable_mockModule('../llm/api.js', () => ({
 	callApi: mockCallApi,
-	callBatchApi: jest.fn(),
 }))
 
 const { PatchSession } = await import('./build.js')
