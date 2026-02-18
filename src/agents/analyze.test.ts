@@ -597,7 +597,7 @@ describe('getRecentIterationSummary', () => {
 		})
 
 		const summary = await getRecentIterationSummary()
-		expect(summary).toContain('2/2 merged')
+		expect(summary).toContain('2 merged')
 		expect(summary).toContain('0 failed')
 	})
 
@@ -625,8 +625,8 @@ describe('getRecentIterationSummary', () => {
 		})
 
 		const summary = await getRecentIterationSummary()
-		expect(summary).toContain('1/1 merged')
-		expect(summary).toContain('1 iter w/ fixes')
+		expect(summary).toContain('1 merged')
+		expect(summary).toContain('1 iterations needed 1+ fix')
 	})
 
 	it('identifies common issue types', async () => {
@@ -670,7 +670,7 @@ describe('getRecentIterationSummary', () => {
 		}
 
 		const summary = await getRecentIterationSummary(5)
-		expect(summary).toContain('5/5 merged')
+		expect(summary).toContain('5 merged')
 	})
 
 	it('handles mixed outcomes correctly', async () => {
@@ -702,8 +702,8 @@ describe('getRecentIterationSummary', () => {
 		})
 
 		const summary = await getRecentIterationSummary()
-		expect(summary).toContain('2/3 merged')
+		expect(summary).toContain('2 merged')
 		expect(summary).toContain('1 failed')
-		expect(summary).toContain('2 iter w/ fixes')
+		expect(summary).toContain('2 iterations needed 1+ fix')
 	})
 })

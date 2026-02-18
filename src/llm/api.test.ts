@@ -61,6 +61,11 @@ jest.unstable_mockModule('../agents/memory.js', () => ({
 	getMemoryContext: mockGetMemoryContext,
 }))
 
+const mockGetRecentIterationSummary = jest.fn<() => Promise<string>>().mockResolvedValue('')
+jest.unstable_mockModule('../agents/analyze.js', () => ({
+	getRecentIterationSummary: mockGetRecentIterationSummary,
+}))
+
 jest.unstable_mockModule('./prompts.js', () => ({
 	SYSTEM_PLAN: 'plan prompt',
 	SYSTEM_BUILD: 'build prompt',
