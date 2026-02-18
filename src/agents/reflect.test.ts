@@ -266,4 +266,94 @@ describe('reflect', () => {
 		expect(transcript).toContain('Use Map in api.ts')
 		expect(transcript).not.toContain('[tool: submit_plan]')
 	})
+
+	it('summarizes grep_search with singular match', async () => {
+		const messages = [
+			{
+				role: 'assistant' as const,
+				content: [{ type: 'tool_use' as const, id: 't1', name: 'grep_search', input: { query: 'findme' } }],
+			},
+			{
+				role: 'user' as const,
+				content: [{ type: 'tool_result' as const, tool_use_id: 't1', content: 'file.ts:1: findme' }],
+			},
+		]
+
+		await reflect('Done', messages)
+
+		const transcript = ((mockCallApi.mock.calls[0] as unknown[])[1] as Array<{ content: string }>)[0].content
+		expect(transcript).toContain(': 1 match]')
+		expect(transcript).not.toContain('matches]')
+	})
+
+	it('summarizes file_search with singular result', async () => {
+		const messages = [
+			{
+				role: 'assistant' as const,
+				content: [{ type: 'tool_use' as const, id: 't1', name: 'file_search', input: { query: '**/*.ts' } }],
+			},
+			{
+				role: 'user' as const,
+				content: [{ type: 'tool_result' as const, tool_use_id: 't1', content: 'a.ts' }],
+			},
+		]
+
+		await reflect('Done', messages)
+
+		const transcript = ((mockCallApi.mock.calls[0] as unknown[])[1] as Array<{ content: string }>)[0].content
+		expect(transcript).toContain('1 result]')
+		expect(transcript).not.toContain('results]')
+	})
+
+	it('summarizes list_directory with singular entry', async () => {
+		const messages = [
+			{
+				role: 'assistant' as const,
+				content: [{ type: 'tool_use' as const, id: 't1', name: 'list_directory', input: { path: 'src' } }],
+			},
+			{
+				role: 'user' as const,
+				content: [{ type: 'tool_result' as const, tool_use_id: 't1', content: 'index.ts' }],
+			},
+		]
+
+		await reflect('Done', messages)
+
+		const transcript = ((mockCallApi.mock.calls[0] as unknown[])[1] as Array<{ content: string }>)[0].content
+		expect(transcript).toContain('1 entry]')
+		expect(transcript).not.toContain('entries]')
+	})
+
+	it('handles non-string tool_result content (array)', async () => {
+		const messages = [
+			{
+				role: 'assistant' as const,
+				content: [{ type: 'tool_use' as const, id: 't1', name: 'read_file', input: { filePath: 'src/a.ts' } }],
+			},
+			{
+				role: 'user' as const,
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				content: [{ type: 'tool_result' as const, tool_use_id: 't1', content: [{ type: 'text', text: 'nested' }] } as any],
+			},
+		]
+
+		await reflect('Done', messages)
+
+		const transcript = ((mockCallApi.mock.calls[0] as unknown[])[1] as Array<{ content: string }>)[0].content
+		expect(transcript).toContain('[Read src/a.ts')
+	})
+
+	it('falls back to raw text for orphaned tool_result with no matching tool_use', async () => {
+		const messages = [
+			{
+				role: 'user' as const,
+				content: [{ type: 'tool_result' as const, tool_use_id: 'unknown-id', content: 'orphaned result text' }],
+			},
+		]
+
+		await reflect('Done', messages)
+
+		const transcript = ((mockCallApi.mock.calls[0] as unknown[])[1] as Array<{ content: string }>)[0].content
+		expect(transcript).toContain('orphaned result text')
+	})
 })
