@@ -10,6 +10,7 @@ import GeneratedModel, { computeCost, type ApiUsage } from '../models/Generated.
 import { getMemoryContext } from '../agents/memory.js'
 import { getRecentLog } from '../tools/git.js'
 import { getLatestMainCoverage } from '../tools/github.js'
+import { getRecentIterationSummary } from '../agents/analyze.js'
 
 export type Phase = 'planner' | 'builder' | 'fixer' | 'reflect' | 'memory'
 
@@ -68,6 +69,10 @@ async function buildParams(phase: Phase, messages: Anthropic.MessageParam[], too
 		const unusedFunctions = await findUnusedFunctions(env.workspacePath)
 		if (unusedFunctions) {
 			system.push({ type: 'text', text: `\n\n## Unused Functions\n${unusedFunctions}` })
+		}
+		const iterationSummary = await getRecentIterationSummary()
+		if (iterationSummary) {
+			system.push({ type: 'text', text: `\n\n## Recent Iteration Outcomes\n${iterationSummary}` })
 		}
 	}
 

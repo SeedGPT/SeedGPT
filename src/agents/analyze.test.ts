@@ -1,7 +1,7 @@
 import { jest, describe, it, expect, beforeAll, afterAll, beforeEach } from '@jest/globals'
 import mongoose from 'mongoose'
 import { MongoMemoryReplSet } from 'mongodb-memory-server'
-import { analyzeIterations, formatAnalysisReport, type AnalysisReport } from './analyze.js'
+import { analyzeIterations, formatAnalysisReport, getRecentIterationSummary, type AnalysisReport } from './analyze.js'
 import GeneratedModel from '../models/Generated.js'
 import IterationLogModel from '../models/IterationLog.js'
 
@@ -572,5 +572,138 @@ describe('formatAnalysisReport', () => {
 
 		expect(formatted).toContain('Date: 2025-01-01')
 		expect(formatted).not.toContain('Date range:')
+	})
+})
+
+describe('getRecentIterationSummary', () => {
+	it('returns empty string when no iterations exist', async () => {
+		const summary = await getRecentIterationSummary()
+		expect(summary).toBe('')
+	})
+
+	it('summarizes successful merged iterations', async () => {
+		await IterationLogModel.create({
+			entries: [
+				{ timestamp: '2025-01-01T10:00:00Z', level: 'info', message: 'Planned: "test"' },
+				{ timestamp: '2025-01-01T10:05:00Z', level: 'info', message: 'PR #1 merged successfully.' },
+			],
+		})
+
+		await IterationLogModel.create({
+			entries: [
+				{ timestamp: '2025-01-01T11:00:00Z', level: 'info', message: 'Planned: "test2"' },
+				{ timestamp: '2025-01-01T11:05:00Z', level: 'info', message: 'PR #2 merged, branch deleted. Change is now on main.' },
+			],
+		})
+
+		const summary = await getRecentIterationSummary()
+		expect(summary).toContain('2/2 merged')
+		expect(summary).toContain('0 failed')
+	})
+
+	it('tracks failed iterations', async () => {
+		await IterationLogModel.create({
+			entries: [
+				{ timestamp: '2025-01-01T10:00:00Z', level: 'info', message: 'Planned: "test"' },
+				{ timestamp: '2025-01-01T10:05:00Z', level: 'error', message: 'FAILED — PR #1 closed without merging, branch deleted.' },
+			],
+		})
+
+		const summary = await getRecentIterationSummary()
+		expect(summary).toContain('0 merged')
+		expect(summary).toContain('1 failed')
+	})
+
+	it('tracks fix attempts', async () => {
+		await IterationLogModel.create({
+			entries: [
+				{ timestamp: '2025-01-01T10:00:00Z', level: 'info', message: 'Planned: "test"' },
+				{ timestamp: '2025-01-01T10:05:00Z', level: 'warn', message: 'CI failed (attempt 1), attempting fix: error' },
+				{ timestamp: '2025-01-01T10:06:00Z', level: 'info', message: 'Pushed fix commit (attempt 1).' },
+				{ timestamp: '2025-01-01T10:10:00Z', level: 'info', message: 'PR #1 merged successfully.' },
+			],
+		})
+
+		const summary = await getRecentIterationSummary()
+		expect(summary).toContain('1/1 merged')
+		expect(summary).toContain('1 iter w/ fixes')
+	})
+
+	it('identifies common issue types', async () => {
+		await IterationLogModel.create({
+			entries: [
+				{ timestamp: '2025-01-01T10:00:00Z', level: 'info', message: 'Planned: "test"' },
+				{ timestamp: '2025-01-01T10:05:00Z', level: 'warn', message: 'CI failed (attempt 1), attempting fix: Tests failed in test.ts' },
+				{ timestamp: '2025-01-01T10:06:00Z', level: 'error', message: 'FAILED — PR #1 closed' },
+			],
+		})
+
+		await IterationLogModel.create({
+			entries: [
+				{ timestamp: '2025-01-01T11:00:00Z', level: 'info', message: 'Planned: "test2"' },
+				{ timestamp: '2025-01-01T11:05:00Z', level: 'warn', message: 'CI failed (attempt 1), attempting fix: Build failed' },
+				{ timestamp: '2025-01-01T11:06:00Z', level: 'error', message: 'FAILED — PR #2 closed' },
+			],
+		})
+
+		await IterationLogModel.create({
+			entries: [
+				{ timestamp: '2025-01-01T12:00:00Z', level: 'info', message: 'Planned: "test3"' },
+				{ timestamp: '2025-01-01T12:05:00Z', level: 'warn', message: 'CI failed (attempt 1), attempting fix: test fail detected' },
+				{ timestamp: '2025-01-01T12:06:00Z', level: 'error', message: 'FAILED — PR #3 closed' },
+			],
+		})
+
+		const summary = await getRecentIterationSummary()
+		expect(summary).toContain('test failures: 2')
+		expect(summary).toContain('build failures: 1')
+	})
+
+	it('respects limit parameter', async () => {
+		for (let i = 1; i <= 15; i++) {
+			await IterationLogModel.create({
+				entries: [
+					{ timestamp: `2025-01-01T${String(i).padStart(2, '0')}:00:00Z`, level: 'info', message: `Iteration ${i}` },
+					{ timestamp: `2025-01-01T${String(i).padStart(2, '0')}:05:00Z`, level: 'info', message: `PR #${i} merged successfully.` },
+				],
+			})
+		}
+
+		const summary = await getRecentIterationSummary(5)
+		expect(summary).toContain('5/5 merged')
+	})
+
+	it('handles mixed outcomes correctly', async () => {
+		// Merged iteration
+		await IterationLogModel.create({
+			entries: [
+				{ timestamp: '2025-01-01T10:00:00Z', level: 'info', message: 'Planned: "test1"' },
+				{ timestamp: '2025-01-01T10:05:00Z', level: 'info', message: 'PR #1 merged successfully.' },
+			],
+		})
+
+		// Failed iteration with fix attempt
+		await IterationLogModel.create({
+			entries: [
+				{ timestamp: '2025-01-01T11:00:00Z', level: 'info', message: 'Planned: "test2"' },
+				{ timestamp: '2025-01-01T11:05:00Z', level: 'warn', message: 'CI failed (attempt 1), attempting fix: test error' },
+				{ timestamp: '2025-01-01T11:06:00Z', level: 'error', message: 'FAILED — PR #2 closed' },
+			],
+		})
+
+		// Merged iteration with fix
+		await IterationLogModel.create({
+			entries: [
+				{ timestamp: '2025-01-01T12:00:00Z', level: 'info', message: 'Planned: "test3"' },
+				{ timestamp: '2025-01-01T12:05:00Z', level: 'warn', message: 'CI failed (attempt 1), attempting fix: lint error' },
+				{ timestamp: '2025-01-01T12:06:00Z', level: 'info', message: 'Pushed fix commit (attempt 1).' },
+				{ timestamp: '2025-01-01T12:10:00Z', level: 'info', message: 'PR #3 merged successfully.' },
+			],
+		})
+
+		const summary = await getRecentIterationSummary()
+		expect(summary).toContain('2/3 merged')
+		expect(summary).toContain('1 failed')
+		expect(summary).toContain('2 iter w/ fixes')
 	})
 })

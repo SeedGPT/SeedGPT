@@ -2,6 +2,88 @@ import GeneratedModel from '../models/Generated.js'
 import IterationLogModel from '../models/IterationLog.js'
 import logger from '../logger.js'
 
+/**
+ * Get a concise summary of the last N iterations for planner context.
+ * Returns stats on merge success rate, fix attempts, and common issues.
+ */
+export async function getRecentIterationSummary(limit = 10): Promise<string> {
+	try {
+		// Get last N iteration logs (each log represents one complete iteration)
+		const recentLogs = await IterationLogModel.find()
+			.sort({ createdAt: -1 })
+			.limit(limit)
+			.lean()
+			.exec()
+
+		if (recentLogs.length === 0) {
+			return ''
+		}
+
+		let merged = 0
+		let failed = 0
+		let iterationsWithFixes = 0
+		const issues: Record<string, number> = {}
+
+		for (const log of recentLogs) {
+			const entries = log.entries || []
+			let hasMerge = false
+			let hasFix = false
+
+			for (const entry of entries) {
+				const msg = entry.message || ''
+
+				// Check for merge success
+				if (msg.includes('merged successfully') || msg.includes('merged, branch deleted')) {
+					hasMerge = true
+				}
+
+				// Check for fixes
+				if (msg.includes('attempting fix') || msg.includes('Pushed fix commit')) {
+					hasFix = true
+				}
+
+				// Track failure types
+				if (msg.includes('test fail') || msg.includes('Tests failed')) {
+					issues['test failures'] = (issues['test failures'] || 0) + 1
+				} else if (msg.includes('build fail') || msg.includes('Build failed')) {
+					issues['build failures'] = (issues['build failures'] || 0) + 1
+				} else if (msg.includes('type check') || msg.includes('Type error')) {
+					issues['type errors'] = (issues['type errors'] || 0) + 1
+				} else if (msg.includes('lint') || msg.includes('Lint failed')) {
+					issues['lint errors'] = (issues['lint errors'] || 0) + 1
+				}
+			}
+
+			if (hasMerge) merged++
+			else failed++
+
+			if (hasFix) iterationsWithFixes++
+		}
+
+		// Format the summary
+		const parts: string[] = []
+		parts.push(`Recent ${recentLogs.length} iterations: ${merged} merged, ${failed} failed`)
+
+		if (iterationsWithFixes > 0) {
+			parts.push(`Fix attempts: ${iterationsWithFixes} iterations needed 1+ fix`)
+		}
+
+		const issueList = Object.entries(issues)
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 3)
+			.map(([type, count]) => `${type}: ${count}`)
+
+		if (issueList.length > 0) {
+			parts.push(`Common issues: [${issueList.join(', ')}]`)
+		}
+
+		return parts.join(' | ')
+	} catch (error) {
+		logger.log('error', 'Failed to compute recent iteration summary', { error })
+		return ''
+	}
+}
+
 export interface PhaseStats {
 	count: number
 	totalCost: number
