@@ -79,7 +79,7 @@ export async function getRecentIterationSummary(limit = 10): Promise<string> {
 
 		return parts.join(' | ')
 	} catch (error) {
-		logger.log('error', 'Failed to compute recent iteration summary', { error })
+		logger.error('Failed to compute recent iteration summary', { error })
 		return ''
 	}
 }
