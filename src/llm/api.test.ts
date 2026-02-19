@@ -72,6 +72,11 @@ jest.unstable_mockModule('./prompts.js', () => ({
 	SYSTEM_SUMMARIZE: 'summarize prompt',
 }))
 
+const mockPrepareAndBuildContext = jest.fn<() => Promise<string | null>>().mockResolvedValue(null)
+jest.unstable_mockModule('../tools/context.js', () => ({
+	prepareAndBuildContext: mockPrepareAndBuildContext,
+}))
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let mockCreate: jest.Mock<(...args: any[]) => any>
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -126,6 +131,7 @@ beforeEach(() => {
 	mockBatchResults.mockReset()
 	mockComputeCost.mockReset().mockReturnValue(0.01)
 	mockModelCreate.mockReset().mockResolvedValue(undefined as never)
+	mockPrepareAndBuildContext.mockReset().mockResolvedValue(null)
 })
 
 function* yieldSucceeded(ids: string[], messages: typeof fakeMessage[]) {
@@ -273,6 +279,29 @@ describe('callApi', () => {
 		const batchParams = mockBatchCreate.mock.calls[0][0] as { requests: Array<{ params: { system: Array<{ text: string }> } }> }
 		const systemTexts = batchParams.requests[0].params.system.map((s: { text: string }) => s.text)
 		expect(systemTexts.some((t: string) => t.includes('deadFunc'))).toBe(true)
+	})
+
+	it('includes large files in planner when present', async () => {
+		setupBatchMocks()
+		const findLarge = (await import('../tools/codebase.js')).findLargeFiles as jest.MockedFunction<() => Promise<string | null>>
+		findLarge.mockResolvedValueOnce('src/big.ts: 600 lines')
+
+		await callApi('planner', [{ role: 'user', content: 'plan' }])
+
+		const batchParams = mockBatchCreate.mock.calls[0][0] as { requests: Array<{ params: { system: Array<{ text: string }> } }> }
+		const systemTexts = batchParams.requests[0].params.system.map((s: { text: string }) => s.text)
+		expect(systemTexts.some((t: string) => t.includes('src/big.ts'))).toBe(true)
+	})
+
+	it('includes working context in system prompt when present', async () => {
+		setupBatchMocks()
+		mockPrepareAndBuildContext.mockResolvedValueOnce('## Working Context\nsome active file content')
+
+		await callApi('builder', [{ role: 'user', content: 'build' }])
+
+		const batchParams = mockBatchCreate.mock.calls[0][0] as { requests: Array<{ params: { system: Array<{ text: string }> } }> }
+		const systemTexts = batchParams.requests[0].params.system.map((s: { text: string }) => s.text)
+		expect(systemTexts.some((t: string) => t.includes('Working Context'))).toBe(true)
 	})
 
 	it('applies cache_control to last block before working context', async () => {
